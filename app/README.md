@@ -15,12 +15,30 @@ Opcjonalnie własny RPC (publiczny devnet ma niskie limity), w `app/.env.local`:
 VITE_RPC_URL=https://devnet.helius-rpc.com/?api-key=...
 ```
 
+## Adresy (React Router)
+
+| URL | Strona |
+|---|---|
+| `/` | lejek dla kupujących: kalkulator ochrony, problem, jak działa, porównanie |
+| `/sprzedawca` | dla sprzedawców: korzyści, Twoje oferty, wystawienie oferty |
+| `/oferta/:adres[/:zakładka]` | oferta; sprzedawca: `przeglad`, `analityka`, `symulator`, `kupujacy`, `historia`; kupujący: `oferta`, `przejrzystosc`, `historia` |
+| `/portfel/:adres[/kupujacy\|/sprzedawca\|/historia]` | dowolny portfel: rola, zakupy, oferty, historia |
+| `/konto` | przekierowanie na portfel połączonego konta |
+
+Stare linki `/?offer=…` i `/?wallet=…` przekierowują na nowe adresy. Hosting SPA: `vercel.json` (Vercel) i `public/_redirects` (Netlify) kierują każdy adres na `index.html`.
+
+## Pliki
+
 | Plik | Co robi |
 |---|---|
+| `src/App.tsx` | definicja tras |
+| `src/shell.tsx` | nagłówek, nawigacja, stopka, wysyłanie transakcji (`useTx`), powiadomienia |
+| `src/pages/` | strony: `Home`, `Seller`, `OfferPage`, `WalletPage`, `AddressLookup`, `misc` (konto, 404, stare linki) |
+| `src/OfferView.tsx` | zawartość strony oferty z zakładkami |
+| `src/WalletView.tsx` | zawartość strony portfela |
+| `src/funnel.tsx` | miernik ochrony, kroki kupującego, sekcje lejka |
 | `src/program.ts` | klient programu: PDA, instrukcje, dekodowanie kont, `due()` jak w programie |
-| `src/activity.ts` | historia oferty z transakcji i logów programu |
-| `src/OfferView.tsx` | strona oferty z zakładkami (sprzedawca / kupujący) |
+| `src/activity.ts` | historia z transakcji i logów programu (oferta albo portfel) |
 | `src/charts.tsx`, `src/PriceChart.tsx` | wykresy |
-| `src/App.tsx` | nagłówek, strona główna, tworzenie oferty |
 
 Kwoty w interfejsie są w zł: 1 zł = 0,0001 SOL (żeby testowy SOL z faucetu wystarczył).

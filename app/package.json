@@ -16,7 +16,8 @@
     "@solana/web3.js": "^1.99.0",
     "buffer": "^6.0.3",
     "react": "^19.2.8",
-    "react-dom": "^19.2.8"
+    "react-dom": "^19.2.8",
+    "react-router": "^7.18.4"
   },
   "devDependencies": {
     "@types/node": "^24.13.3",

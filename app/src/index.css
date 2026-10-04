@@ -322,3 +322,24 @@ td.actions { display: flex; gap: 6px; }
 .claim-all .due { margin: 0; text-align: left; }
 .err-text { color: var(--err); }
 a.small-btn { padding: 7px 12px; font-size: 0.82rem; }
+
+/* ---------- nawigacja i strony ---------- */
+.mainnav { display: flex; gap: 4px; margin-right: auto; margin-left: 24px; }
+.mainnav a { text-decoration: none; color: var(--text-2); font-weight: 600; font-size: 0.92rem; padding: 8px 12px; border-radius: 8px; }
+.mainnav a:hover { background: var(--bg); color: var(--text); }
+.mainnav a.active { color: var(--brand-strong); background: var(--brand-soft); }
+@media (max-width: 860px) {
+  .topbar { flex-wrap: wrap; }
+  .mainnav { order: 3; width: 100%; margin: 0; overflow-x: auto; }
+  .balance { display: none; }
+}
+.cta-band { display: flex; justify-content: space-between; align-items: center; gap: 20px; flex-wrap: wrap; background: var(--surface); border: 1px solid var(--border); border-radius: 18px; padding: 24px; box-shadow: var(--shadow); }
+.cta-band .section-title { margin: 0 0 6px; }
+.cta-band p { margin: 0; }
+.seller-band { background: var(--brand-soft); border-color: transparent; }
+.lookup { display: flex; gap: 8px; flex-wrap: wrap; flex: 1 1 360px; max-width: 520px; }
+.lookup input { flex: 1 1 240px; }
+.lookup .err-text { width: 100%; margin: 0; }
+.narrow { max-width: 520px; margin: 40px auto; }
+.narrow .wallet-adapter-button { margin: 8px auto 0; }
+.create { max-width: 760px; }

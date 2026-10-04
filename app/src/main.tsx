@@ -1,4 +1,5 @@
 import { StrictMode } from 'react'
+import { BrowserRouter } from 'react-router'
 import { createRoot } from 'react-dom/client'
 import { ConnectionProvider, WalletProvider } from '@solana/wallet-adapter-react'
 import { WalletModalProvider } from '@solana/wallet-adapter-react-ui'
@@ -13,12 +14,14 @@ const RPC = import.meta.env.VITE_RPC_URL || 'https://api.devnet.solana.com'
 // Phantom wykrywany przez Wallet Standard, lista adapterów może być pusta.
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <ConnectionProvider endpoint={RPC}>
-      <WalletProvider wallets={[]} autoConnect>
-        <WalletModalProvider>
-          <App />
-        </WalletModalProvider>
-      </WalletProvider>
-    </ConnectionProvider>
+    <BrowserRouter>
+      <ConnectionProvider endpoint={RPC}>
+        <WalletProvider wallets={[]} autoConnect>
+          <WalletModalProvider>
+            <App />
+          </WalletModalProvider>
+        </WalletProvider>
+      </ConnectionProvider>
+    </BrowserRouter>
   </StrictMode>,
 )

@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useWallet } from '@solana/wallet-adapter-react'
 import { WalletMultiButton } from '@solana/wallet-adapter-react-ui'
-import type { PublicKey, TransactionInstruction } from '@solana/web3.js'
+import type { PublicKey } from '@solana/web3.js'
 import { totals, type ActivityEvent } from './activity'
+import type { Send } from './shell'
 import { LineChart, MoneySplit, UnlockSchedule, fmtIn } from './charts'
 import { PriceChart } from './PriceChart'
 import { ProtectionMeter, Stepper, type StepState } from './funnel'
@@ -23,7 +24,6 @@ import {
   type Purchase,
 } from './program'
 
-export type Send = (label: string, ix: TransactionInstruction | TransactionInstruction[]) => Promise<string | undefined>
 
 type Props = {
   offer: Offer
@@ -62,27 +62,23 @@ function fmtLeft(secs: number) {
   return d > 0 ? `${d} d ${h} h` : h > 0 ? `${h} h ${m} min` : `${m} min ${s} s`
 }
 
-const SELLER_TABS = ['Przegląd', 'Analityka', 'Symulator ceny', 'Kupujący', 'Historia'] as const
-const BUYER_TABS = ['Oferta', 'Przejrzystość', 'Historia'] as const
+// Zakładki = osobne adresy: /oferta/:adres[/:slug]. Pierwsza zakładka nie ma sluga w URL.
+export const SELLER_TABS = [
+  { slug: 'przeglad', label: 'Przegląd' },
+  { slug: 'analityka', label: 'Analityka' },
+  { slug: 'symulator', label: 'Symulator ceny' },
+  { slug: 'kupujacy', label: 'Kupujący' },
+  { slug: 'historia', label: 'Historia' },
+] as const
+export const BUYER_TABS = [
+  { slug: 'oferta', label: 'Oferta' },
+  { slug: 'przejrzystosc', label: 'Przejrzystość' },
+  { slug: 'historia', label: 'Historia' },
+] as const
 
-function useTab(tabs: readonly string[]) {
-  const slug = (t: string) => t.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/ /g, '-')
-  const fromHash = () => tabs.find((t) => `#${slug(t)}` === location.hash) ?? tabs[0]
-  const [tab, setTab] = useState(fromHash)
-  useEffect(() => {
-    const on = () => setTab(fromHash())
-    window.addEventListener('hashchange', on)
-    return () => window.removeEventListener('hashchange', on)
-  })
-  useEffect(() => {
-    if (!tabs.includes(tab)) setTab(tabs[0])
-  }, [tabs, tab])
-  return [tab, (t: string) => { history.replaceState(null, '', `#${slug(t)}`); setTab(t) }] as const
-}
-
-export function OfferView(p: Props) {
+export function OfferView(p: Props & { tab: string; onTab: (slug: string) => void }) {
   const tabs = p.isSeller ? SELLER_TABS : BUYER_TABS
-  const [tab, setTab] = useTab(tabs)
+  const { tab, onTab } = p
   const owedNow = p.purchases.reduce((s, x) => s + due(x, p.offer), 0n)
 
   return (
@@ -90,21 +86,21 @@ export function OfferView(p: Props) {
       <ProductCard offer={p.offer} name={p.name} isSeller={p.isSeller} />
       <nav className="tabs" role="tablist">
         {tabs.map((t) => (
-          <button key={t} role="tab" aria-selected={tab === t} className={tab === t ? 'active' : ''} onClick={() => setTab(t)}>
-            {t}
-            {t === 'Kupujący' && <span className="count">{p.purchases.length}</span>}
-            {t === 'Oferta' && p.mine && due(p.mine, p.offer) > 0n && <span className="dot-badge" />}
-            {t === 'Przegląd' && owedNow > 0n && <span className="dot-badge" />}
+          <button key={t.slug} role="tab" aria-selected={tab === t.slug} className={tab === t.slug ? 'active' : ''} onClick={() => onTab(t.slug)}>
+            {t.label}
+            {t.slug === 'kupujacy' && <span className="count">{p.purchases.length}</span>}
+            {t.slug === 'oferta' && p.mine && due(p.mine, p.offer) > 0n && <span className="dot-badge" />}
+            {t.slug === 'przeglad' && owedNow > 0n && <span className="dot-badge" />}
           </button>
         ))}
       </nav>
-      {tab === 'Przegląd' && <SellerOverview {...p} goTo={setTab} />}
-      {tab === 'Analityka' && <Analytics {...p} />}
-      {tab === 'Symulator ceny' && <Simulator {...p} />}
-      {tab === 'Kupujący' && <PurchaseList {...p} />}
-      {tab === 'Oferta' && <BuyerPanel {...p} />}
-      {tab === 'Przejrzystość' && <Analytics {...p} />}
-      {tab === 'Historia' && <ActivityFeed events={p.events} offer={p.offer} />}
+      {tab === 'przeglad' && <SellerOverview {...p} goTo={onTab} />}
+      {tab === 'analityka' && <Analytics {...p} />}
+      {tab === 'symulator' && <Simulator {...p} />}
+      {tab === 'kupujacy' && <PurchaseList {...p} />}
+      {tab === 'oferta' && <BuyerPanel {...p} />}
+      {tab === 'przejrzystosc' && <Analytics {...p} />}
+      {tab === 'historia' && <ActivityFeed events={p.events} offer={p.offer} />}
     </>
   )
 }
@@ -189,11 +185,11 @@ function SellerOverview({ offer, purchases, events, now, busy, send, goTo }: Pro
           <Stat label="Maks. dalszy koszt" value={fmtZl(s.maxFurtherCost)} hint="najgorszy przypadek, znany z góry" />
         </div>
       </section>
-      <QuickPrice offer={offer} purchases={purchases} now={now} busy={busy} send={send} onMore={() => goTo('Symulator ceny')} />
+      <QuickPrice offer={offer} purchases={purchases} now={now} busy={busy} send={send} onMore={() => goTo('symulator')} />
       <section className="card">
         <div className="spread">
           <h2>Ostatnie zdarzenia</h2>
-          <button className="link" onClick={() => goTo('Historia')}>cała historia →</button>
+          <button className="link" onClick={() => goTo('historia')}>cała historia →</button>
         </div>
         <EventList events={events ? events.slice(-5).reverse() : null} offer={offer} />
       </section>

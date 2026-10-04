@@ -3,7 +3,8 @@ import { useConnection, useWallet } from '@solana/wallet-adapter-react'
 import { PublicKey } from '@solana/web3.js'
 import { fetchActivity, fetchWalletActivity, rolesIn, type ActivityEvent } from './activity'
 import { fmtIn } from './charts'
-import type { Send } from './OfferView'
+import type { Send } from './shell'
+import { Link } from 'react-router'
 import {
   claimIx,
   due,
@@ -26,10 +27,26 @@ type SellerOffer = { offer: Offer; purchases: Purchase[] }
 type BuyerItem = { purchase: Purchase; offer: Offer | null }
 
 const TABS = ['Podsumowanie', 'Jako kupujący', 'Jako sprzedawca', 'Historia'] as const
+export type WalletTab = (typeof TABS)[number]
+// Adresy zakładek: /portfel/:adres[/kupujacy|/sprzedawca|/historia]
+export const WALLET_TAB_SLUGS: Record<WalletTab, string> = {
+  Podsumowanie: '',
+  'Jako kupujący': 'kupujacy',
+  'Jako sprzedawca': 'sprzedawca',
+  Historia: 'historia',
+}
 
 export function WalletView({
-  wallet, names, now, busy, send,
-}: { wallet: PublicKey; names: Record<string, string>; now: number; busy: boolean; send: Send }) {
+  wallet, names, now, busy, send, tab, onTab,
+}: {
+  wallet: PublicKey
+  names: Record<string, string>
+  now: number
+  busy: boolean
+  send: Send
+  tab: WalletTab
+  onTab: (t: WalletTab) => void
+}) {
   const { connection } = useConnection()
   const { publicKey } = useWallet()
   const addr = wallet.toBase58()
@@ -38,7 +55,6 @@ export function WalletView({
   const [selling, setSelling] = useState<SellerOffer[] | null>(null)
   const [buying, setBuying] = useState<BuyerItem[] | null>(null)
   const [events, setEvents] = useState<ActivityEvent[] | null>(null)
-  const [tab, setTab] = useState<(typeof TABS)[number]>('Podsumowanie')
 
   const load = useCallback(async () => {
     // Stan bieżący: oferty sprzedawcy i aktywne zakupy kupującego.
@@ -145,7 +161,7 @@ export function WalletView({
 
       <nav className="tabs" role="tablist">
         {tabs.map((t) => (
-          <button key={t} role="tab" aria-selected={tab === t} className={tab === t ? 'active' : ''} onClick={() => setTab(t)}>
+          <button key={t} role="tab" aria-selected={tab === t} className={tab === t ? 'active' : ''} onClick={() => onTab(t)}>
             {t}
             {t === 'Jako kupujący' && buyerDue > 0n && <span className="dot-badge" />}
           </button>
@@ -212,7 +228,7 @@ export function WalletView({
                     const left = Number(p.windowEnd) - now
                     return (
                       <tr key={p.address.toBase58()}>
-                        <td><a href={`?offer=${p.offer.toBase58()}`}>{nameOf(p.offer.toBase58())}</a></td>
+                        <td><Link to={`/oferta/${p.offer.toBase58()}`}>{nameOf(p.offer.toBase58())}</Link></td>
                         <td>{fmtZl(p.paid)}</td>
                         <td>{fmtZl(p.reserve - p.claimed)}</td>
                         <td><b>{fmtZl(d)}</b></td>
@@ -241,7 +257,7 @@ export function WalletView({
                 <tbody>
                   {[...selling].sort((a, b) => Number(b.offer.offerId - a.offer.offerId)).map(({ offer: o, purchases }) => (
                     <tr key={o.address.toBase58()}>
-                      <td><a href={`?offer=${o.address.toBase58()}`}>{nameOf(o.address.toBase58())}</a></td>
+                      <td><Link to={`/oferta/${o.address.toBase58()}`}>{nameOf(o.address.toBase58())}</Link></td>
                       <td>{fmtZl(o.price)}</td>
                       <td>{fmtZl(o.floor)}</td>
                       <td>{purchases.length}</td>
@@ -275,7 +291,7 @@ export function WalletView({
                           <span key={r} className={`role mini ${r === 'seller' ? 'seller-role' : ''}`}>{r === 'seller' ? 'sprzedawca' : 'kupujący'}</span>
                         ))}{' '}
                         {describe(e)}
-                        {e.offer && <> · <a href={`?offer=${e.offer}`}>{nameOf(e.offer)}</a></>}
+                        {e.offer && <> · <Link to={`/oferta/${e.offer}`}>{nameOf(e.offer)}</Link></>}
                       </div>
                       <div className="muted small">
                         {fmtDate(e.ts)} · <a href={explorerTx(e.sig)} target="_blank" rel="noreferrer">transakcja ↗</a>
