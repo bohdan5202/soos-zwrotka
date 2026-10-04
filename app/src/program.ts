@@ -235,6 +235,17 @@ export async function fetchPurchase(c: Connection, address: PublicKey) {
   return acc ? decodePurchase(address, acc.data) : null;
 }
 
+/** Aktywne zakupy danego kupującego (buyer leży po dyskryminatorze i polu offer: offset 40). */
+export async function fetchBuyerPurchases(c: Connection, buyer: PublicKey) {
+  const accs = await c.getProgramAccounts(PROGRAM_ID, {
+    filters: [
+      { memcmp: { offset: 0, bytes: bs58Disc(DISC.purchase) } },
+      { memcmp: { offset: 40, bytes: buyer.toBase58() } },
+    ],
+  });
+  return accs.map((a) => decodePurchase(a.pubkey, a.account.data));
+}
+
 /** Wszystkie oferty danego sprzedawcy (seller leży zaraz po dyskryminatorze). */
 export async function fetchSellerOffers(c: Connection, seller: PublicKey) {
   const accs = await c.getProgramAccounts(PROGRAM_ID, {

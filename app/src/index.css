@@ -312,3 +312,13 @@ td.actions { display: flex; gap: 6px; }
 .buy-box { display: flex; flex-direction: column; gap: 10px; }
 .checks { list-style: none; padding: 0; margin: 4px 0 8px; display: grid; gap: 6px; color: var(--text-2); font-size: 0.92rem; }
 .meter-slider input[type='range'] { flex: none; width: 100%; }
+
+/* ---------- portfel ---------- */
+.mono { font-family: ui-monospace, 'SFMono-Regular', Consolas, monospace; letter-spacing: 0; }
+.roles { display: flex; flex-direction: column; gap: 6px; align-items: flex-end; }
+@media (max-width: 520px) { .roles { align-items: flex-start; } }
+.role.mini { font-size: 0.68rem; padding: 2px 7px; margin-right: 4px; vertical-align: 1px; }
+.claim-all { display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; }
+.claim-all .due { margin: 0; text-align: left; }
+.err-text { color: var(--err); }
+a.small-btn { padding: 7px 12px; font-size: 0.82rem; }

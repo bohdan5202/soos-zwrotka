@@ -23,7 +23,7 @@ import {
   type Purchase,
 } from './program'
 
-export type Send = (label: string, ix: TransactionInstruction) => Promise<string | undefined>
+export type Send = (label: string, ix: TransactionInstruction | TransactionInstruction[]) => Promise<string | undefined>
 
 type Props = {
   offer: Offer

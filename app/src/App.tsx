@@ -6,6 +6,7 @@ import { fetchActivity, type ActivityEvent } from './activity'
 import { BRAND, Logo, TAGLINE } from './brand'
 import { FunnelSections, ProtectionMeter } from './funnel'
 import { OfferView, type Send } from './OfferView'
+import { WalletView } from './WalletView'
 import {
   createOfferIx,
   explorerTx,
@@ -16,6 +17,7 @@ import {
   fetchSellerOffers,
   fmtZl,
   offerPda,
+  PROGRAM_ID,
   purchasePda,
   toLamports,
   type Offer,
@@ -63,6 +65,14 @@ export default function App() {
     }
   }, [offerParam])
   const name = params.get('name') ?? (offerParam && loadNames()[offerParam]) ?? 'Kurs: Solana i Anchor od podstaw'
+  const walletParam = params.get('wallet')
+  const walletAddr = useMemo(() => {
+    try {
+      return walletParam ? new PublicKey(walletParam) : null
+    } catch {
+      return null
+    }
+  }, [walletParam])
 
   const [offer, setOffer] = useState<Offer | null>(null)
   const [loaded, setLoaded] = useState(false)
@@ -117,7 +127,7 @@ export default function App() {
     setBusy(true)
     setError(null)
     try {
-      const tx = new Transaction().add(ix)
+      const tx = new Transaction().add(...(Array.isArray(ix) ? ix : [ix]))
       const sig = await sendTransaction(tx, connection)
       const bh = await connection.getLatestBlockhash()
       await connection.confirmTransaction({ signature: sig, ...bh }, 'confirmed')
@@ -146,6 +156,9 @@ export default function App() {
           <span className="net">devnet</span>
         </a>
         <div className="wallet">
+          {publicKey && (
+            <a className="btn secondary small-btn" href={`?wallet=${publicKey.toBase58()}`}>Moje konto</a>
+          )}
           {publicKey && isSeller && <span className="role seller-role">Sprzedawca</span>}
           {publicKey && offer && !isSeller && <span className="role">Kupujący</span>}
           {balance !== null && <span className="muted small">{balance.toFixed(3)} SOL</span>}
@@ -161,7 +174,9 @@ export default function App() {
           </div>
         )}
 
-        {!offerParam && <Landing busy={busy} send={send} />}
+        {walletParam && !walletAddr && <div className="card">Nieprawidłowy adres portfela.</div>}
+        {walletAddr && <WalletView wallet={walletAddr} names={loadNames()} now={now} busy={busy} send={send} />}
+        {!offerParam && !walletParam && <Landing busy={busy} send={send} />}
         {offerParam && !offerAddr && <div className="card">Nieprawidłowy adres oferty.</div>}
         {offerAddr && !loaded && <div className="card muted">Ładowanie oferty…</div>}
         {offerAddr && loaded && !offer && <div className="card">Ta oferta nie istnieje na devnecie.</div>}
@@ -287,6 +302,22 @@ function CreateOffer({ busy, send }: { busy: boolean; send: Send }) {
   const [unit, setUnit] = useState<'min' | 'd'>('min')
   const [eventAt, setEventAt] = useState('')
   const [existing, setExisting] = useState('')
+  const [lookupError, setLookupError] = useState<string | null>(null)
+  const { connection } = useConnection()
+
+  // Konto należące do programu = oferta; wszystko inne traktujemy jak portfel.
+  const openAddress = async () => {
+    setLookupError(null)
+    let key: PublicKey
+    try {
+      key = new PublicKey(existing.trim())
+    } catch {
+      setLookupError('To nie jest poprawny adres Solany.')
+      return
+    }
+    const acc = await connection.getAccountInfo(key).catch(() => null)
+    location.search = acc?.owner.equals(PROGRAM_ID) ? `?offer=${key.toBase58()}` : `?wallet=${key.toBase58()}`
+  }
 
   const create = async () => {
     if (!publicKey) return
@@ -349,12 +380,16 @@ function CreateOffer({ busy, send }: { busy: boolean; send: Send }) {
         </button>
       </section>
       <section className="card">
-        <h2>Masz link do oferty?</h2>
-        <p className="muted small">Wklej adres oferty od sprzedawcy.</p>
+        <h2>Sprawdź ofertę lub portfel</h2>
+        <p className="muted small">
+          Wklej adres oferty albo dowolnego portfela. Zobaczysz, czy jest sprzedawcą, kupującym, i co dzieje się z jego
+          pieniędzmi w Zwrotce.
+        </p>
         <div className="inline">
-          <input placeholder="adres oferty" value={existing} onChange={(e) => setExisting(e.target.value)} />
-          <button disabled={!existing} onClick={() => (location.search = `?offer=${existing.trim()}`)}>Otwórz</button>
+          <input placeholder="adres" value={existing} onChange={(e) => setExisting(e.target.value)} />
+          <button disabled={!existing || busy} onClick={openAddress}>Sprawdź</button>
         </div>
+        {lookupError && <p className="small err-text">{lookupError}</p>}
       </section>
     </div>
   )
