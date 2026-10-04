@@ -4,6 +4,7 @@ import { WalletMultiButton } from '@solana/wallet-adapter-react-ui'
 import { PublicKey, Transaction } from '@solana/web3.js'
 import { fetchActivity, type ActivityEvent } from './activity'
 import { BRAND, Logo, TAGLINE } from './brand'
+import { FunnelSections, ProtectionMeter } from './funnel'
 import { OfferView, type Send } from './OfferView'
 import {
   createOfferIx,
@@ -202,26 +203,40 @@ export default function App() {
 function Landing({ busy, send }: { busy: boolean; send: Send }) {
   return (
     <>
-      <section className="hero">
-        <h1>{TAGLINE}</h1>
-        <p className="lead">
-          Gwarancja najniższej ceny, której sprzedawca <b>nie może złamać</b>. Jeśli cena spadnie po Twoim zakupie,
-          różnicę wypłaca program na Solanie: bez reklamacji, bez proszenia, bez pośrednika.
-        </p>
-        <ol className="steps">
-          <li>
-            <b>Kupujesz</b>
-            <span>Sprzedawca od razu dostaje część ceny (floor). Reszta czeka w rezerwie programu.</span>
-          </li>
-          <li>
-            <b>Cena spada?</b>
-            <span>Program sam zna historię cen. Widzisz kwotę do odebrania.</span>
-          </li>
-          <li>
-            <b>Odbierasz różnicę</b>
-            <span>Jednym kliknięciem, bez podpisu sprzedawcy. Po końcu okna resztę dostaje sprzedawca.</span>
-          </li>
-        </ol>
+      <section className="hero hero-grid">
+        <div>
+          <div className="eyebrow">Ochrona ceny on-chain</div>
+          <h1>{TAGLINE}</h1>
+          <p className="lead">
+            Kupujesz kurs albo bilet, a tydzień później jest promocja? Ze Zwrotką <b>różnica wraca do Ciebie
+            automatycznie</b>. Pieniądze na zwrot są zablokowane od chwili zakupu, a sprzedawca nie może ich ruszyć
+            ani odmówić.
+          </p>
+          <div className="cta-row">
+            <a className="btn big" href="#ochrona">Sprawdź, ile odzyskasz</a>
+            <a className="btn secondary big" href="#sprzedawca">Jestem sprzedawcą</a>
+          </div>
+          <ul className="trust">
+            <li>🔒 Rezerwa w programie, nie u sprzedawcy</li>
+            <li>⚡ Zwrot bez reklamacji</li>
+            <li>🔎 Historia cen publiczna</li>
+          </ul>
+        </div>
+        <div className="card hero-card" id="ochrona">
+          <ProtectionMeter price={1000} floor={800} editable title="Policz swoją ochronę" />
+        </div>
+      </section>
+
+      <FunnelSections />
+
+      <section className="section" id="sprzedawca">
+        <div className="eyebrow">Dla sprzedawców</div>
+        <h2 className="section-title">Sprzedawaj wcześniej. Twój koszt gwarancji znasz z góry.</h2>
+        <div className="cards3">
+          <div className="pain"><span className="pain-icon">💰</span><b>Pieniądze od razu</b><span>Floor (np. 80–90% ceny) trafia do Ciebie w chwili sprzedaży.</span></div>
+          <div className="pain"><span className="pain-icon">📊</span><b>Maksymalny koszt = rezerwa</b><span>Nigdy nie oddasz więcej niż cena − floor. Symulator pokaże koszt każdej obniżki.</span></div>
+          <div className="pain"><span className="pain-icon">🚀</span><b>Klienci nie czekają</b><span>„Kup teraz, nie stracisz na promocji” zamienia odkładanie zakupu w sprzedaż dziś.</span></div>
+        </div>
       </section>
       <MyOffers />
       <CreateOffer busy={busy} send={send} />

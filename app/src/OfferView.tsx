@@ -5,6 +5,7 @@ import type { PublicKey, TransactionInstruction } from '@solana/web3.js'
 import { totals, type ActivityEvent } from './activity'
 import { LineChart, MoneySplit, UnlockSchedule, fmtIn } from './charts'
 import { PriceChart } from './PriceChart'
+import { ProtectionMeter, Stepper, type StepState } from './funnel'
 import {
   buyIx,
   claimIx,
@@ -377,27 +378,55 @@ function Simulator({ offer, purchases, now, busy, send }: Props) {
 
 // ---------- Kupujący ----------
 
+function BuyerSteps({ connected, bought, active, refunded }: { connected: boolean; bought: boolean; active: boolean; refunded: boolean }) {
+  const st = (done: boolean, current: boolean): StepState => (done ? 'done' : current ? 'current' : 'todo')
+  return (
+    <Stepper
+      steps={[
+        { label: 'Sprawdź ochronę', hint: 'ile odzyskasz przy promocji', state: st(bought || connected, !connected) },
+        { label: 'Kup z ochroną', hint: 'rezerwa blokuje się w programie', state: st(bought, connected && !bought) },
+        { label: 'Ochrona aktywna', hint: 'program pilnuje ceny za Ciebie', state: st(bought && !active, bought && active && !refunded) },
+        { label: 'Zwrot różnicy', hint: 'bez reklamacji i zgody sprzedawcy', state: st(refunded, bought && !active && !refunded) },
+      ]}
+    />
+  )
+}
+
 function BuyerPanel({ offer, mine, now, busy, send }: Props) {
   const { publicKey } = useWallet()
-  if (!publicKey) {
-    return (
-      <section className="card buyer center">
-        <p>Połącz portfel, żeby kupić z gwarancją ceny.</p>
-        <WalletMultiButton />
-      </section>
-    )
-  }
+  const priceZl = toZl(offer.price)
+  const floorZl = toZl(offer.price < offer.floor ? offer.price : offer.floor)
+
   if (!mine) {
     const toSeller = offer.price < offer.floor ? offer.price : offer.floor
     return (
-      <section className="card buyer">
-        <button className="big wide" disabled={busy} onClick={() => send(`Zakup za ${fmtZl(offer.price)}`, buyIx(publicKey, offer))}>
-          Kup za {fmtZl(offer.price)}
-        </button>
-        <p className="muted small center">
-          {fmtZl(toSeller)} trafi do sprzedawcy od razu, {fmtZl(offer.price - toSeller)} czeka w rezerwie na ewentualny zwrot.
-        </p>
-      </section>
+      <>
+        <BuyerSteps connected={!!publicKey} bought={false} active={false} refunded={false} />
+        <div className="grid2 buy-grid">
+          <section className="card">
+            <ProtectionMeter key={priceZl} price={priceZl} floor={floorZl} title="Co jeśli cena spadnie po Twoim zakupie?" />
+          </section>
+          <section className="card buyer buy-box">
+            <div className="muted small">Cena dziś</div>
+            <div className="price">{fmtZl(offer.price)}</div>
+            <ul className="checks">
+              <li>✓ Ochrona do {fmtZl(offer.price - toSeller)} przez {offer.windowSecs > 0n ? fmtDuration(Number(offer.windowSecs)) : 'okres oferty'}</li>
+              <li>✓ Rezerwa zablokowana w programie, nie u sprzedawcy</li>
+              <li>✓ Zwrot jednym kliknięciem albo automatycznie</li>
+            </ul>
+            {publicKey ? (
+              <button className="big wide" disabled={busy} onClick={() => send(`Zakup za ${fmtZl(offer.price)}`, buyIx(publicKey, offer))}>
+                Kup z ochroną ceny
+              </button>
+            ) : (
+              <div className="center"><WalletMultiButton /></div>
+            )}
+            <p className="muted small center">
+              {fmtZl(toSeller)} trafi do sprzedawcy od razu, {fmtZl(offer.price - toSeller)} czeka w rezerwie.
+            </p>
+          </section>
+        </div>
+      </>
     )
   }
   const d = due(mine, offer)
@@ -405,6 +434,8 @@ function BuyerPanel({ offer, mine, now, busy, send }: Props) {
   const total = Number(mine.windowEnd - mine.boughtAt) || 1
   const progress = Math.min(100, Math.max(0, ((total - left) / total) * 100))
   return (
+    <>
+    <BuyerSteps connected bought active={left > 0} refunded={mine.claimed > 0n && d === 0n && left <= 0} />
     <section className="card buyer">
       <div className="spread">
         <h2>Twój zakup</h2>
@@ -431,6 +462,17 @@ function BuyerPanel({ offer, mine, now, busy, send }: Props) {
       </div>
       <p className="muted small">Zwrot wysyła program. Sprzedawca nie musi go zatwierdzać i nie może go zablokować.</p>
     </section>
+    {left > 0 && (
+      <section className="card">
+        <ProtectionMeter
+          key={String(mine.paid)}
+          price={toZl(mine.paid)}
+          floor={toZl(mine.paid - mine.reserve)}
+          title="Twoja ochrona: co jeśli cena spadnie dalej?"
+        />
+      </section>
+    )}
+    </>
   )
 }
 

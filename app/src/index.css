@@ -251,3 +251,64 @@ td.actions { display: flex; gap: 6px; }
 .toasts { position: fixed; right: 16px; bottom: 16px; display: flex; flex-direction: column; gap: 8px; z-index: 20; }
 .toast { display: flex; gap: 14px; align-items: center; background: var(--text); color: var(--surface); padding: 12px 16px; border-radius: 12px; box-shadow: 0 8px 24px rgb(0 0 0 / 0.2); font-size: 0.9rem; }
 .toast a { color: var(--brand-soft); font-weight: 600; }
+
+/* ---------- lejek: strona główna ---------- */
+.hero-grid { display: grid; grid-template-columns: 1.1fr 1fr; gap: 28px; align-items: center; padding-top: 36px; }
+@media (max-width: 860px) { .hero-grid { grid-template-columns: 1fr; } }
+.hero-card { margin: 0; }
+.cta-row { display: flex; gap: 12px; flex-wrap: wrap; margin: 4px 0 18px; }
+.btn { display: inline-block; text-decoration: none; padding: 10px 18px; border-radius: 10px; background: var(--brand); color: var(--on-brand); font-weight: 600; }
+.btn.big { padding: 13px 22px; font-size: 1.02rem; }
+.btn.secondary { background: transparent; color: var(--brand-strong); border: 1px solid var(--brand); }
+.btn:hover { filter: brightness(1.07); }
+.trust { list-style: none; padding: 0; margin: 0; display: flex; gap: 16px; flex-wrap: wrap; color: var(--text-2); font-size: 0.9rem; }
+
+.section { margin: 56px 0 8px; }
+.section-title { font-size: clamp(1.35rem, 2.6vw, 1.8rem); margin: 4px 0 18px; }
+.cards3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; }
+.pain { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 18px; display: flex; flex-direction: column; gap: 8px; box-shadow: var(--shadow); }
+.pain span:not(.pain-icon) { color: var(--text-2); font-size: 0.93rem; line-height: 1.5; }
+.pain-icon { font-size: 1.6rem; }
+
+.timeline { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 14px; position: relative; }
+.timeline li { display: flex; gap: 12px; background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 16px; }
+.timeline li > span { font-size: 1.4rem; width: 44px; height: 44px; border-radius: 12px; background: var(--brand-soft); display: grid; place-items: center; flex-shrink: 0; }
+.timeline p { margin: 4px 0 0; color: var(--text-2); font-size: 0.9rem; line-height: 1.45; }
+
+.compare { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; }
+.compare th, .compare td { padding: 12px 14px; white-space: normal; }
+.compare th:last-child, .compare td:last-child { background: var(--brand-soft); color: var(--brand-strong); }
+.compare td:first-child { color: var(--text-2); font-weight: 500; }
+
+/* ---------- miernik ochrony ---------- */
+.meter-title { margin: 0; font-size: 1.05rem; color: var(--text); }
+.meter-inputs { margin-top: 12px; }
+.meter-bar { position: relative; display: flex; height: 44px; border-radius: 10px; overflow: visible; margin: 34px 0 6px; gap: 2px; }
+.zone { display: grid; place-items: center; font-size: 0.75rem; font-weight: 600; overflow: hidden; white-space: nowrap; }
+.zone.out { background: var(--bg); color: var(--muted); border: 1px dashed var(--border); border-radius: 10px 0 0 10px; }
+.zone.in { background: var(--ok-soft); color: var(--ok); border: 1px solid var(--ok); border-radius: 0 10px 10px 0; }
+.cursor { position: absolute; top: -8px; bottom: -8px; width: 3px; background: var(--text); border-radius: 2px; transform: translateX(-50%); transition: left 0.1s; }
+.cursor-label { position: absolute; bottom: 100%; left: 50%; transform: translate(-50%, -4px); background: var(--text); color: var(--surface); font-size: 0.75rem; font-weight: 700; padding: 3px 8px; border-radius: 6px; white-space: nowrap; }
+.meter-scale { position: relative; display: flex; justify-content: space-between; font-size: 0.75rem; color: var(--muted); height: 18px; }
+.meter-scale .ok-text { color: var(--ok); font-weight: 600; }
+.meter-slider { margin: 14px 0 10px; }
+.meter-result { padding: 14px 16px; border-radius: 12px; background: var(--bg); color: var(--text-2); line-height: 1.5; }
+.meter-result.yes { background: var(--ok-soft); color: var(--ok); }
+.meter-result b { font-size: 1.15rem; }
+
+/* ---------- kroki kupującego ---------- */
+.stepper { list-style: none; padding: 0; margin: 0 0 18px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+@media (max-width: 760px) { .stepper { grid-template-columns: 1fr 1fr; } }
+.stepper li { display: flex; gap: 10px; align-items: flex-start; padding: 12px; border-radius: 12px; border: 1px solid var(--border); background: var(--surface); }
+.stepper li div { display: flex; flex-direction: column; gap: 2px; font-size: 0.88rem; }
+.stepper li div span { color: var(--muted); font-size: 0.78rem; }
+.step-dot { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; font-size: 0.8rem; font-weight: 700; background: var(--bg); color: var(--muted); border: 1px solid var(--border); flex-shrink: 0; }
+.stepper li.current { border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-soft); }
+.stepper li.current .step-dot { background: var(--brand); color: var(--on-brand); border-color: var(--brand); }
+.stepper li.done .step-dot { background: var(--ok-soft); color: var(--ok); border-color: var(--ok); }
+
+.buy-grid { grid-template-columns: 1.4fr 1fr; }
+@media (max-width: 760px) { .buy-grid { grid-template-columns: 1fr; } }
+.buy-box { display: flex; flex-direction: column; gap: 10px; }
+.checks { list-style: none; padding: 0; margin: 4px 0 8px; display: grid; gap: 6px; color: var(--text-2); font-size: 0.92rem; }
+.meter-slider input[type='range'] { flex: none; width: 100%; }

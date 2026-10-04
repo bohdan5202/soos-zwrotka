@@ -8,3 +8,4 @@ test-ledger
 .surfpool
 test-ledger/
 .env
+.claude/
