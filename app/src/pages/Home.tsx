@@ -18,6 +18,10 @@ export function Home() {
           <div className="cta-row">
             <Link className="btn big" to="/katalog">Zobacz oferty z ochroną</Link>
             <Link className="btn secondary big" to="/sprzedawca">Jestem sprzedawcą</Link>
+            <a className="watch-link" href="#nagranie">
+              <span className="watch-icon" aria-hidden="true" />
+              Obejrzyj, jak to działa (3 min)
+            </a>
           </div>
           <ul className="trust">
             <li>Rezerwa w programie, nie u sprzedawcy</li>
@@ -29,6 +33,8 @@ export function Home() {
           <ProtectionMeter price={1000} floor={800} editable title="Policz swoją ochronę" />
         </div>
       </section>
+
+      <DemoVideo />
 
       <FunnelSections />
 
@@ -48,5 +54,41 @@ export function Home() {
         <Link className="btn big" to="/sprzedawca">Wystaw ofertę z gwarancją →</Link>
       </section>
     </>
+  )
+}
+
+const LOOM_ID = '967a8b047d714571859c72c81578a7fb'
+
+/** Nagranie Loom z przejściem przez cały system: zakup, obniżka, odbiór różnicy, panel sprzedawcy. */
+function DemoVideo() {
+  return (
+    <section className="section reportage" id="nagranie" aria-labelledby="nagranie-title">
+      <figure className="reportage-video">
+        <div className="video-frame">
+          <iframe
+            src={`https://www.loom.com/embed/${LOOM_ID}?hide_owner=true&hide_share=true&hide_title=true&hideEmbedTopBar=true`}
+            title="Nagranie: jak działa Zwrotka dla kupującego i sprzedawcy"
+            loading="lazy"
+            allow="fullscreen; picture-in-picture"
+            allowFullScreen
+          />
+        </div>
+        <figcaption>
+          Nagranie z devnetu Solany, 3 min. Ceny w zł, płatność w testowym SOL.{' '}
+          <a href={`https://www.loom.com/share/${LOOM_ID}`} target="_blank" rel="noreferrer">Otwórz w Loom</a>
+        </figcaption>
+      </figure>
+      <div className="reportage-side">
+        <h2 className="section-title" id="nagranie-title">Jeden kurs, dwie strony, trzy minuty</h2>
+        <p className="muted">Kupujemy kurs programowania, sprzedawca obniża cenę, a różnica wraca do kupującego bez zgody sprzedawcy.</p>
+        <ol className="reportage-steps">
+          <li>Kupujący przegląda oferty i kupuje kurs za 400 zł, podpisując zakup w portfelu.</li>
+          <li>Od razu widzi floor, który dostał sprzedawca, i rezerwę czekającą na zwrot.</li>
+          <li>Sprzedawca obniża cenę. Kupującemu należy się 135 zł.</li>
+          <li>Historia ceny i lista kupujących są publiczne na blockchainie.</li>
+          <li>Różnicę odbiera się jednym kliknięciem. Na koniec statystyki platformy i portfela.</li>
+        </ol>
+      </div>
+    </section>
   )
 }

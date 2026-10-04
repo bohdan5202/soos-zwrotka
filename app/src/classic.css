@@ -276,3 +276,13 @@
 @media (max-width: 520px) {
   [data-style='classic'] .card { padding: 16px; }
 }
+
+/* nagranie */
+[data-style='classic'] .reportage { border-top: 0; gap: 28px; align-items: start; }
+[data-style='classic'] .reportage-video { padding-right: 0; }
+[data-style='classic'] .video-frame { border: 1px solid var(--border); border-radius: 16px; overflow: hidden; box-shadow: var(--shadow); }
+[data-style='classic'] .reportage-side { border-left: 0; padding-left: 0; }
+[data-style='classic'] .reportage-steps { border-top: 0; }
+[data-style='classic'] .reportage-steps li::before { font-weight: 800; font-size: 0.85rem; width: 24px; height: 24px; border-radius: 8px; background: var(--brand-soft); display: grid; place-items: center; }
+[data-style='classic'] .watch-icon { border-color: var(--border); background: var(--surface); }
+@media (max-width: 860px) { [data-style='classic'] .reportage-side { margin-top: 0; } }
