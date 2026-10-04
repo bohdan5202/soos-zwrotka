@@ -100,6 +100,8 @@ function CreateOffer() {
   }
 
   const pct = price > 0 ? Math.round(((price - floor) / price) * 100) : 0
+  // Program odrzuca ofertę z datą wydarzenia w przeszłości.
+  const eventPast = eventAt !== '' && new Date(eventAt).getTime() <= Date.now()
 
   return (
     <section className="card create">
@@ -137,10 +139,11 @@ function CreateOffer() {
         <label>
           Start wydarzenia (opcjonalnie)
           <input type="datetime-local" value={eventAt} onChange={(e) => setEventAt(e.target.value)} />
+          {eventPast && <span className="err-text small">Data wydarzenia musi być w przyszłości.</span>}
         </label>
       </div>
       {publicKey ? (
-        <button className="big" disabled={busy || floor > price || price <= 0} onClick={create}>
+        <button className="big" disabled={busy || floor > price || price <= 0 || eventPast} onClick={create}>
           Wystaw ofertę
         </button>
       ) : (

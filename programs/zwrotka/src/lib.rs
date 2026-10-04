@@ -33,8 +33,8 @@ pub mod zwrotka {
         )
     }
 
-    pub fn buy(ctx: Context<Buy>) -> Result<()> {
-        crate::instructions::buy::handle_buy(ctx)
+    pub fn buy(ctx: Context<Buy>, max_price: u64) -> Result<()> {
+        crate::instructions::buy::handle_buy(ctx, max_price)
     }
 
     pub fn set_price(ctx: Context<SetPrice>, new_price: u64) -> Result<()> {

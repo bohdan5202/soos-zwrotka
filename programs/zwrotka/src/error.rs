@@ -18,10 +18,16 @@ pub enum ErrorCode {
     Overflow,
     #[msg("Sales for this offer are closed")]
     SalesClosed,
-    #[msg("Refund cannot be lower than what the buyer is already owed")]
-    RefundBelowDue,
+    #[msg("Refund cannot be lower than the buyer's remaining reserve")]
+    RefundBelowReserve,
     #[msg("Refund cannot exceed what the buyer paid minus what was already returned")]
     RefundAbovePaid,
     #[msg("Reason is too long")]
     ReasonTooLong,
+    #[msg("Price is higher than the buyer agreed to pay")]
+    PriceAboveMax,
+    #[msg("Event start date is in the past")]
+    EventInPast,
+    #[msg("Guarantee window would already be over")]
+    GuaranteeEnded,
 }

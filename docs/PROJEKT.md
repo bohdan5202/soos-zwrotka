@@ -37,7 +37,7 @@ Instrukcje:
 | Instrukcja | Kto | Co robi |
 |---|---|---|
 | `create_offer(offer_id, price, floor, window_secs, event_start)` | sprzedawca | `floor ≤ price`, okno: dni i/lub data wydarzenia |
-| `buy()` | kupujący | `min(price, floor)` → sprzedawca, reszta → rezerwa w `Purchase` |
+| `buy(max_price)` | kupujący | `min(price, floor)` → sprzedawca, reszta → rezerwa w `Purchase`. Odrzuca zakup, jeśli cena wzrosła ponad `max_price` albo okno gwarancji już minęło |
 | `set_price(new_price)` | tylko sprzedawca | dowolna cena > 0 (także poniżej floor), wpis do historii, limit 32 |
 | `claim_difference()` | ktokolwiek | wypłaca `due` kupującemu, bez podpisu sprzedawcy |
 | `release()` | ktokolwiek, po `window_end` | `due` → kupujący, reszta rezerwy → sprzedawca, zamyka `Purchase` (rent → kupujący) |
