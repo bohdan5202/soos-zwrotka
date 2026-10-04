@@ -8,7 +8,7 @@ HackYeah 2026 · wyzwanie **Superteam Poland: Finance Without Intermediaries** �
 
 **Program ID (devnet):** [`44sG9n516FQKsDNC2uwyKPUKSksyDLH4ypzsVHgJGGB7`](https://explorer.solana.com/address/44sG9n516FQKsDNC2uwyKPUKSksyDLH4ypzsVHgJGGB7?cluster=devnet)
 
-**Demo na żywo:** **https://soos-zwrotka.vercel.app** (Phantom przełączony na devnet)
+**Demo na żywo:** **https://soos-zwrotka.vercel.app** (Phantom przełączony na devnet) · **Slajdy:** [`docs/prezentacja.pdf`](docs/prezentacja.pdf)
 
 | Strona | Co tam jest |
 |---|---|
