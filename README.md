@@ -31,14 +31,24 @@ HackYeah 2026 · wyzwanie **Superteam Poland: Finance Without Intermediaries** �
 | [`state.rs` → `Purchase::due`](programs/zwrotka/src/state.rs) | należność = `min(zapłacone − najniższa cena w oknie, rezerwa) − już odebrane` |
 | [`instructions/claim_difference.rs`](programs/zwrotka/src/instructions/claim_difference.rs) | **wypłata zwrotu bez podpisu sprzedawcy** |
 | [`instructions/release.rs`](programs/zwrotka/src/instructions/release.rs) | po końcu okna: najpierw należność kupującego, potem reszta sprzedawcy |
+| [`instructions/refund_purchase.rs`](programs/zwrotka/src/instructions/refund_purchase.rs) | anulowanie zakupu przez sprzedawcę: kupujący dostaje **co najmniej całą rezerwę** (resztę dopłaca sprzedawca), więc anulowaniem nie da się odebrać gwarancji |
+| [`instructions/close_sales.rs`](programs/zwrotka/src/instructions/close_sales.rs) | koniec sprzedaży; anulowanie oferty = `close_sales` + `refund_purchase` dla każdego zakupu |
+| [`instructions/request_refund.rs`](programs/zwrotka/src/instructions/request_refund.rs) | prośba kupującego o zwrot (konto `RefundRequest`), decyzja należy do sprzedawcy |
+| [`instructions/buy.rs`](programs/zwrotka/src/instructions/buy.rs) `max_price` | zakup nie przejdzie, jeśli sprzedawca podniósł cenę ponad tę, którą kupujący zaakceptował |
 
 ## Pytania jury
 
 - **Co, jeśli sprzedawca zniknie?** Rezerwa leży w koncie programu, nie u sprzedawcy. Kupujący odbiera różnicę bez niego, a `release` może wywołać każdy.
 - **Co, jeśli kupujący zniknie?** Po końcu okna ktokolwiek wywołuje `release`: kupujący i tak dostaje należną różnicę (nawet jeśli nie kliknął „odbierz”), sprzedawca dostaje resztę.
-- **Kto ma jakie uprawnienia?** Zmiana ceny: tylko sprzedawca oferty (`has_one = seller`). Zwrot i rozliczenie: każdy, ale kwoty i odbiorców liczy program. Program nie ma konta admina. Upgrade authority na czas hackathonu ma portfel deployujący; docelowo `none`.
+- **Kto ma jakie uprawnienia?**
+  - `set_price`, `close_sales`, `refund_purchase`: tylko sprzedawca oferty (`has_one = seller`). `refund_purchase` nie może dać kupującemu mniej niż cała rezerwa.
+  - `request_refund`: tylko kupujący danego zakupu.
+  - `claim_difference`, `release`: każdy, ale kwoty i odbiorców liczy program.
+  - Program nie ma konta admina ani instrukcji „wypłać rezerwę na dowolny adres”.
+  - Upgrade authority na czas hackathonu: portfel deployujący [`CGH9s71RJVVBBRGJudA1tLTdpNDBAfWeAwLNmf63dnSw`](https://explorer.solana.com/address/CGH9s71RJVVBBRGJudA1tLTdpNDBAfWeAwLNmf63dnSw?cluster=devnet). Docelowo multisig, a po audycie `none` (program niezmienny).
 - **Dlaczego blockchain, a nie baza danych?** W bazie danych sprzedawca może edytować historię cen i trzyma pieniądze. Tu historia cen jest publiczna, a rezerwa zablokowana od chwili zakupu.
-- **Ograniczenia (otwarcie):** gwarancja obejmuje tylko cenę w tym programie, nie sprzedaż innymi kanałami ani nową ofertą na to samo wydarzenie. MVP rozlicza się w SOL (USDC to następny krok).
+- **Ograniczenia (otwarcie):** gwarancja obejmuje tylko cenę w tym programie, nie sprzedaż innymi kanałami ani nową ofertą na to samo wydarzenie. MVP rozlicza się w SOL, więc wartość rezerwy w zł zmienia się z kursem (USDC to następny krok). Spory o jakość usługi nie są rozstrzygane automatycznie: jest tylko anulowanie przez sprzedawcę i prośba o zwrot.
+- **Co dalej za tydzień?** USDC/SPL Token zamiast SOL; `close_offer` (zwrot rentu oferty); anulowanie za zgodą obu stron i arbiter wybrany z góry, który może tylko podzielić rezerwę; przycisk „Kup z ochroną” dla sklepów (Solana Blinks); rozmowy z 2–3 szkołami i organizatorami. Pełny projekt: [`docs/UNIWERSALNY.md`](docs/UNIWERSALNY.md).
 
 ## Uruchomienie
 
@@ -46,11 +56,15 @@ HackYeah 2026 · wyzwanie **Superteam Poland: Finance Without Intermediaries** �
 make test                      # program + 19 testów LiteSVM
 cd app && npm install && npm run dev   # frontend: http://localhost:5173 (Phantom, devnet)
 node app/scripts/smoke-devnet.ts       # cały scenariusz demo na devnecie z portfela CLI
+node app/scripts/cancel-check.ts       # prośba o zwrot + anulowanie zakupu na devnecie
+node app/scripts/catalog-check.ts "Nazwa"   # oferta z nazwą w Memo + odczyt katalogu
 ```
+
+Frontend: strony `/` (lejek dla kupujących), `/katalog`, `/statystyki`, `/sprzedawca`, `/panel` (panel sprzedawcy), `/oferta/:adres`, `/portfel/:adres`. Szczegóły: [`app/README.md`](app/README.md).
 
 Frontend pokazuje kwoty w zł: 1 zł = 0,0001 SOL (żeby testowy SOL z faucetu wystarczył).
 
-Więcej: [`docs/PROJEKT.md`](docs/PROJEKT.md) (mechanizm, demo), [`docs/PLAN.md`](docs/PLAN.md) (plan pracy), [`docs/POMYSLY.md`](docs/POMYSLY.md) (research i odrzucone pomysły), [`docs/WYZWANIE.md`](docs/WYZWANIE.md) (opis wyzwania).
+Więcej: [`docs/PROJEKT.md`](docs/PROJEKT.md) (mechanizm, demo), [`docs/PLAN.md`](docs/PLAN.md) (plan pracy), [`docs/POMYSLY.md`](docs/POMYSLY.md) (research i odrzucone pomysły), [`docs/WYZWANIE.md`](docs/WYZWANIE.md) (opis wyzwania), [`docs/UNIWERSALNY.md`](docs/UNIWERSALNY.md) (protokół uniwersalny: warunki, spory, macierz przypadków).
 
 ---
 
@@ -206,11 +220,12 @@ Wspólny Program ID: `44sG9n516FQKsDNC2uwyKPUKSksyDLH4ypzsVHgJGGB7`. Jego keypai
 Anchor.toml               # przypięte wersje Anchora i Solany, Program ID
 Makefile                  # komendy (build z --arch v0)
 rust-toolchain.toml       # Rust 1.89.0 dla hosta
-programs/zwrotka/    # program on-chain (Rust/Anchor) + testy LiteSVM
-app/                      # frontend (Vite + React + Wallet Adapter) i skrypt demo na devnecie
+programs/zwrotka/         # program on-chain (Rust/Anchor) + 19 testów LiteSVM
+app/                      # frontend (Vite + React + Router + Wallet Adapter), skrypty devnet w app/scripts
 keys/                     # wspólny keypair programu (devnet)
 scripts/check-env.sh      # weryfikacja środowiska
-docs/                     # PROJEKT.md (co budujemy), opis wyzwania, pomysły
+docs/                     # PROJEKT.md (co budujemy), UNIWERSALNY.md (wizja), wyzwanie, pomysły
+.github/workflows/ci.yml  # CI: build frontendu
 ```
 
 ## Odinstalowanie (po hackathonie)

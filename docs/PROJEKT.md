@@ -28,8 +28,11 @@ MVP rozlicza się w SOL (lamporty). USDC / SPL Token to krok „co dalej”.
 ## Program (zaimplementowany w `programs/zwrotka/src/`)
 
 Konta:
-- `Offer` PDA `["offer", seller, offer_id]`: `seller`, `offer_id`, `price`, `floor`, `window_secs`, `event_start`, historia zmian ceny `Vec<PricePoint { ts, price }>` (max 32), `bump`.
+- `Offer` PDA `["offer", seller, offer_id]`: `seller`, `offer_id`, `price`, `floor`, `window_secs`, `event_start`, historia zmian ceny `Vec<PricePoint { ts, price }>` (max 32), `bump`, `closed` (koniec sprzedaży; na końcu konta, starsze oferty czytają `false`).
 - `Purchase` PDA `["purchase", offer, buyer]` (jeden zakup na kupującego): `paid`, `reserve`, `claimed`, `bought_at`, `window_end`, `first_change` (indeks pierwszej zmiany ceny po zakupie), `bump`. **Konto jest jednocześnie sejfem rezerwy.**
+- `RefundRequest` PDA `["refund_request", purchase]`: `purchase`, `offer`, `buyer`, `requested_at`, `reason` (max 80 B), `bump`. Prośba kupującego o zwrot, zamykana przy `refund_purchase`.
+
+Nazwa oferty nie jest w koncie: trafia jako SPL Memo `zwrotka:title:<nazwa>` do transakcji `create_offer`.
 
 Należność: `due = min(paid − najniższa cena po zakupie do window_end, reserve) − claimed` (`Purchase::due` w `state.rs`).
 
@@ -41,6 +44,9 @@ Instrukcje:
 | `set_price(new_price)` | tylko sprzedawca | dowolna cena > 0 (także poniżej floor), wpis do historii, limit 32 |
 | `claim_difference()` | ktokolwiek | wypłaca `due` kupującemu, bez podpisu sprzedawcy |
 | `release()` | ktokolwiek, po `window_end` | `due` → kupujący, reszta rezerwy → sprzedawca, zamyka `Purchase` (rent → kupujący) |
+| `refund_purchase(amount)` | tylko sprzedawca | anulowanie zakupu: `amount` od całej pozostałej rezerwy do `paid − claimed`; rezerwa w całości → kupujący, resztę dopłaca sprzedawca; zamyka `Purchase` i `RefundRequest` |
+| `close_sales()` | tylko sprzedawca | `closed = true`, `buy` zwraca `SalesClosed`; anulowanie oferty = `close_sales` + `refund_purchase` dla każdego zakupu |
+| `request_refund(reason)` | kupujący | tworzy `RefundRequest`; pieniądze ruszają dopiero przy `refund_purchase` |
 
 Podwyżki ceny nic nie zmieniają dla wcześniejszych kupujących. Testy LiteSVM: `programs/zwrotka/tests/test_price_guarantee.rs`.
 
@@ -55,13 +61,13 @@ Scenariusz: kurs online dla programistów Solany od niezależnej (fikcyjnej) szk
 
 Limit `cena − floor` (np. obniżka do 600 zł → Ania dostaje max 200 zł) pokazujemy na slajdzie i w testach, nie na żywo. Wariant „bilet na wydarzenie” to ten sam program z ustawioną datą wydarzenia.
 
-UI w zł (pod spodem USDC), logowanie bez portfela (Privy / Phantom Connect) to opcja, jeśli zostanie czas.
+UI w zł (pod spodem SOL: 1 zł = 0,0001 SOL na devnecie; USDC to następny krok). Logowanie bez portfela (Privy / Phantom Connect) to opcja na później.
 
 ## Odpowiedzi na pytania jury
 
 - **Gdzie w kodzie znika pośrednik?** W `claim_difference`: nie wymaga podpisu sprzedawcy, a kwotę liczy z historii cen zapisanej w programie.
-- **Co, jeśli sprzedawca zniknie?** Rezerwa leży w vault. Kupujący odbiera różnicę bez sprzedawcy, a `release()` może wywołać każdy.
-- **Czy autor może coś zmienić po deployu?** Po demo ustawiamy upgrade authority na none albo jawnie mówimy, kto ją ma. Program nie ma konta admina.
+- **Co, jeśli sprzedawca zniknie?** Rezerwa leży w koncie `Purchase` programu. Kupujący odbiera różnicę bez sprzedawcy, a `release()` może wywołać każdy.
+- **Czy autor może coś zmienić po deployu?** Upgrade authority ma teraz portfel deployujący `CGH9s71RJVVBBRGJudA1tLTdpNDBAfWeAwLNmf63dnSw` i mówimy o tym jawnie. Docelowo multisig, a po audycie `none`. Program nie ma konta admina.
 - **Słabe punkty (mówimy o nich otwarcie):** gwarancja obejmuje tylko cenę w programie, a nie sprzedaż innymi kanałami. Sprzedawca może wycofać gwarancję dla przyszłych sprzedaży, ale nie dla już sprzedanych biletów.
 - **Co dalej za tydzień?** Rozmowy z 2–3 organizatorami wydarzeń, integracja ze sprzedażą biletów (np. bilet jako NFT/cNFT), on-ramp w zł.
 

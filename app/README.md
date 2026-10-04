@@ -21,7 +21,9 @@ VITE_RPC_URL=https://devnet.helius-rpc.com/?api-key=...
 |---|---|
 | `/` | lejek dla kupujących: kalkulator ochrony, problem, jak działa, porównanie |
 | `/katalog` | wszystkie oferty z programu (bez backendu): wyszukiwanie, sortowanie, rezerwa każdej oferty |
+| `/statystyki` | publiczny stan protokołu: zablokowane rezerwy, należne, aktywne zakupy, oferty |
 | `/sprzedawca` | dla sprzedawców: korzyści, Twoje oferty, wystawienie oferty |
+| `/panel` | panel sprzedawcy: wszystkie oferty razem, statusy zakupów, prośby o zwrot, akcje zbiorcze |
 | `/oferta/:adres[/:zakładka]` | oferta; sprzedawca: `przeglad`, `analityka`, `symulator`, `kupujacy`, `historia`; kupujący: `oferta`, `przejrzystosc`, `historia` |
 | `/portfel/:adres[/kupujacy\|/sprzedawca\|/historia]` | dowolny portfel: rola, zakupy, oferty, historia |
 | `/konto` | przekierowanie na portfel połączonego konta |
@@ -36,7 +38,7 @@ Stare linki `/?offer=…` i `/?wallet=…` przekierowują na nowe adresy. Hostin
 |---|---|
 | `src/App.tsx` | definicja tras |
 | `src/shell.tsx` | nagłówek, nawigacja, stopka, wysyłanie transakcji (`useTx`), powiadomienia |
-| `src/pages/` | strony: `Home`, `Seller`, `OfferPage`, `WalletPage`, `AddressLookup`, `misc` (konto, 404, stare linki) |
+| `src/pages/` | strony: `Home`, `Catalog`, `Stats`, `Seller`, `Panel`, `OfferPage`, `WalletPage`, `AddressLookup`, `misc` (konto, 404, stare linki) |
 | `src/OfferView.tsx` | zawartość strony oferty z zakładkami |
 | `src/WalletView.tsx` | zawartość strony portfela |
 | `src/funnel.tsx` | miernik ochrony, kroki kupującego, sekcje lejka |

@@ -41,7 +41,8 @@ const RE = {
   price: /Price changed to (\d+)/,
   refund: /Refunded (\d+) to buyer/,
   release: /Released: (\d+) to buyer, (\d+) to seller/,
-  sellerRefund: /Refund by seller: (\d+) to buyer \((\d+) from reserve, (\d+) from seller\), (\d+) back to seller/,
+  // Starsza wersja programu dopisywała ", N back to seller"; obecna już nie (rezerwa idzie w całości do kupującego).
+  sellerRefund: /Refund by seller: (\d+) to buyer \((\d+) from reserve, (\d+) from seller\)(?:, (\d+) back to seller)?/,
   closeSales: /Sales closed/,
 };
 
@@ -73,7 +74,7 @@ function parseTx(sig: string, slot: number, tx: VersionedTransactionResponse | n
     else if ((m = l.match(RE.release)))
       evs.push({ ...base, kind: "release", offer: a[0], buyer: a[2], seller: a[3], toBuyer: BigInt(m[1]), toSeller: BigInt(m[2]) });
     else if ((m = l.match(RE.sellerRefund)))
-      evs.push({ ...base, kind: "sellerRefund", offer: a[1], seller: a[0], buyer: a[3], amount: BigInt(m[1]), fromSeller: BigInt(m[3]), toSeller: BigInt(m[4]) });
+      evs.push({ ...base, kind: "sellerRefund", offer: a[1], seller: a[0], buyer: a[3], amount: BigInt(m[1]), fromSeller: BigInt(m[3]), toSeller: BigInt(m[4] ?? "0") });
     else if (RE.closeSales.test(l)) evs.push({ ...base, kind: "closeSales", offer: a[1], seller: a[0] });
   }
   return evs;
