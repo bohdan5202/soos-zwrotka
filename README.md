@@ -8,6 +8,18 @@ HackYeah 2026 · wyzwanie **Superteam Poland: Finance Without Intermediaries** �
 
 **Program ID (devnet):** [`44sG9n516FQKsDNC2uwyKPUKSksyDLH4ypzsVHgJGGB7`](https://explorer.solana.com/address/44sG9n516FQKsDNC2uwyKPUKSksyDLH4ypzsVHgJGGB7?cluster=devnet)
 
+**Demo na żywo:** **https://soos-zwrotka.vercel.app** (Phantom przełączony na devnet)
+
+| Strona | Co tam jest |
+|---|---|
+| [`/`](https://soos-zwrotka.vercel.app/) | strona główna: jak działa ochrona ceny, wejście do katalogu i dla sprzedawców |
+| [`/katalog`](https://soos-zwrotka.vercel.app/katalog) | wszystkie oferty odczytane z programu on-chain |
+| [`/statystyki`](https://soos-zwrotka.vercel.app/statystyki) | statystyki protokołu: ile leży w rezerwach, ile należy się kupującym, aktywne zakupy |
+| [`/sprzedawca`](https://soos-zwrotka.vercel.app/sprzedawca) | wystawienie oferty z gwarancją ceny |
+| [`/panel`](https://soos-zwrotka.vercel.app/panel) | panel sprzedawcy: wszystkie oferty, przychód, zbiorcze rozliczenie i wypłata różnic |
+| `/oferta/:adres`, `/portfel/:adres` | oferta (zakup, odbiór różnicy; dla sprzedawcy zmiana ceny i anulowanie) i zakupy danego portfela |
+| `/api/rpc` | pośrednik JSON-RPC do devnetu: klucz dostawcy zostaje na serwerze, przechodzą tylko metody używane przez frontend |
+
 ## Uzasadnienie projektowe (design rationale)
 
 **Jaką relację finansową przeprojektowaliśmy.** Gwarancję ceny („jeśli obniżymy cenę, oddamy różnicę”). Dają ją Apple, Costco, Best Buy, Amazon w przedsprzedaży. Kupujący dzięki niej kupuje od razu, zamiast czekać na promocję.
