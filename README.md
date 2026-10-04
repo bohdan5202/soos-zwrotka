@@ -48,7 +48,7 @@ HackYeah 2026 · wyzwanie **Superteam Poland: Finance Without Intermediaries** �
 | [`instructions/request_refund.rs`](programs/zwrotka/src/instructions/request_refund.rs) | prośba kupującego o zwrot (konto `RefundRequest`), decyzja należy do sprzedawcy |
 | [`instructions/buy.rs`](programs/zwrotka/src/instructions/buy.rs) `max_price` | zakup nie przejdzie, jeśli sprzedawca podniósł cenę ponad tę, którą kupujący zaakceptował |
 
-## Pytania jury
+## FAQ: środki, uprawnienia, ograniczenia
 
 - **Co, jeśli sprzedawca zniknie?** Rezerwa leży w koncie programu, nie u sprzedawcy. Kupujący odbiera różnicę bez niego, a `release` może wywołać każdy.
 - **Co, jeśli kupujący zniknie?** Po końcu okna ktokolwiek wywołuje `release`: kupujący i tak dostaje należną różnicę (nawet jeśli nie kliknął „odbierz”), sprzedawca dostaje resztę.
