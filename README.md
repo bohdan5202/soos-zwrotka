@@ -26,11 +26,11 @@ HackYeah 2026 · wyzwanie **Superteam Poland: Finance Without Intermediaries** �
 
 | Plik | Co robi |
 |---|---|
-| [`instructions/buy.rs`](programs/bezposrednik/src/instructions/buy.rs) | `floor` → sprzedawca od razu, `cena − floor` → rezerwa w koncie `Purchase` |
-| [`instructions/set_price.rs`](programs/bezposrednik/src/instructions/set_price.rs) | jedyny sposób zmiany ceny; każda zmiana trafia do historii w `Offer` |
-| [`state.rs` → `Purchase::due`](programs/bezposrednik/src/state.rs) | należność = `min(zapłacone − najniższa cena w oknie, rezerwa) − już odebrane` |
-| [`instructions/claim_difference.rs`](programs/bezposrednik/src/instructions/claim_difference.rs) | **wypłata zwrotu bez podpisu sprzedawcy** |
-| [`instructions/release.rs`](programs/bezposrednik/src/instructions/release.rs) | po końcu okna: najpierw należność kupującego, potem reszta sprzedawcy |
+| [`instructions/buy.rs`](programs/zwrotka/src/instructions/buy.rs) | `floor` → sprzedawca od razu, `cena − floor` → rezerwa w koncie `Purchase` |
+| [`instructions/set_price.rs`](programs/zwrotka/src/instructions/set_price.rs) | jedyny sposób zmiany ceny; każda zmiana trafia do historii w `Offer` |
+| [`state.rs` → `Purchase::due`](programs/zwrotka/src/state.rs) | należność = `min(zapłacone − najniższa cena w oknie, rezerwa) − już odebrane` |
+| [`instructions/claim_difference.rs`](programs/zwrotka/src/instructions/claim_difference.rs) | **wypłata zwrotu bez podpisu sprzedawcy** |
+| [`instructions/release.rs`](programs/zwrotka/src/instructions/release.rs) | po końcu okna: najpierw należność kupującego, potem reszta sprzedawcy |
 
 ## Pytania jury
 
@@ -58,7 +58,7 @@ Więcej: [`docs/PROJEKT.md`](docs/PROJEKT.md) (mechanizm, demo), [`docs/PLAN.md`
 
 Ta sekcja jest instrukcją dla agenta AI (Claude Code, Codex itp.), który stawia środowisko na komputerze kolejnej osoby z zespołu.
 
-**Cel:** po zakończeniu w katalogu repo `make check` kończy się kodem 0, a `make test` pokazuje `test result: ok. 1 passed`.
+**Cel:** po zakończeniu w katalogu repo `make check` kończy się kodem 0, a `make test` pokazuje `test result: ok. 10 passed`.
 
 ### Zasady
 
@@ -74,12 +74,12 @@ Ta sekcja jest instrukcją dla agenta AI (Claude Code, Codex itp.), który stawi
 | Składnik | Wersja | Gdzie przypięte / skąd |
 |---|---|---|
 | Solana CLI (Agave), w tym `cargo-build-sbf`, `solana-test-validator` | **3.1.10** | `Anchor.toml` → `[toolchain] solana_version` |
-| Anchor CLI | **1.2.0** | `Anchor.toml` → `[toolchain] anchor_version`, `anchor-lang = "1.2.0"` w `programs/bezposrednik/Cargo.toml` |
+| Anchor CLI | **1.2.0** | `Anchor.toml` → `[toolchain] anchor_version`, `anchor-lang = "1.2.0"` w `programs/zwrotka/Cargo.toml` |
 | avm (menedżer wersji Anchora) | z tagu **v1.2.0** repo `otter-sec/anchor` | Stare adresy `coral-xyz/anchor` i `solana-foundation/anchor` przekierowują na `otter-sec/anchor` |
 | Rust (host, do testów i IDL) | **1.89.0** | `rust-toolchain.toml`; rustup dociąga go sam przy pierwszym `cargo` w repo |
 | Platform-tools (kompilator SBF) | **v1.57** | domyślne w Anchor 1.2.0, pobierane automatycznie przy pierwszym buildzie (~3 GB) |
 | Architektura SBPF | **v0** | `Makefile` (`ARCH ?= v0`). Domyślne v3 z Anchora psuje testy |
-| LiteSVM (testy) | 0.10.0 | `programs/bezposrednik/Cargo.toml` |
+| LiteSVM (testy) | 0.10.0 | `programs/zwrotka/Cargo.toml` |
 | Node.js | **24.x** | `.nvmrc`; potrzebny dopiero przy frontendzie |
 
 ### Krok 0: rozpoznaj system
@@ -163,7 +163,7 @@ make check     # ma się skończyć kodem 0; WARN o saldzie 0 SOL jest dopuszcza
 make test      # pierwszy raz 15–35 min (pobiera platform-tools ~3 GB i kompiluje), potem ~40 s
 ```
 
-Oczekiwany wynik `make test`: linia `test result: ok. 1 passed; 0 failed`.
+Oczekiwany wynik `make test`: linia `test result: ok. 10 passed; 0 failed`.
 
 Opcjonalnie, sprawdzenie deployu bez SOL: `make localnet` w osobnym terminalu, potem `make deploy-local`.
 
@@ -198,7 +198,7 @@ Na koniec przekaż: co zostało zainstalowane (wersje), jakie pliki powłoki zmi
 
 ## Program ID
 
-Wspólny Program ID: `44sG9n516FQKsDNC2uwyKPUKSksyDLH4ypzsVHgJGGB7`. Jego keypair jest celowo w repo (`keys/bezposrednik-program-keypair.json`), żeby każdy budował z tym samym `declare_id!`. Dotyczy wyłącznie devnetu. Aktualizować wdrożony program może tylko portfel, który zrobił pierwszy deploy (upgrade authority).
+Wspólny Program ID: `44sG9n516FQKsDNC2uwyKPUKSksyDLH4ypzsVHgJGGB7`. Jego keypair jest celowo w repo (`keys/zwrotka-program-keypair.json`), żeby każdy budował z tym samym `declare_id!`. Dotyczy wyłącznie devnetu. Aktualizować wdrożony program może tylko portfel, który zrobił pierwszy deploy (upgrade authority).
 
 ## Struktura
 
@@ -206,7 +206,7 @@ Wspólny Program ID: `44sG9n516FQKsDNC2uwyKPUKSksyDLH4ypzsVHgJGGB7`. Jego keypai
 Anchor.toml               # przypięte wersje Anchora i Solany, Program ID
 Makefile                  # komendy (build z --arch v0)
 rust-toolchain.toml       # Rust 1.89.0 dla hosta
-programs/bezposrednik/    # program on-chain (Rust/Anchor) + testy LiteSVM
+programs/zwrotka/    # program on-chain (Rust/Anchor) + testy LiteSVM
 app/                      # frontend (Vite + React + Wallet Adapter) i skrypt demo na devnecie
 keys/                     # wspólny keypair programu (devnet)
 scripts/check-env.sh      # weryfikacja środowiska

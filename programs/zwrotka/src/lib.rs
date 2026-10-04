@@ -12,7 +12,7 @@ pub use state::*;
 declare_id!("44sG9n516FQKsDNC2uwyKPUKSksyDLH4ypzsVHgJGGB7");
 
 #[program]
-pub mod bezposrednik {
+pub mod zwrotka {
     use super::*;
 
     pub fn create_offer(

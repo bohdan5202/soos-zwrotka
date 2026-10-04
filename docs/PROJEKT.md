@@ -25,7 +25,7 @@ MVP rozlicza się w SOL (lamporty). USDC / SPL Token to krok „co dalej”.
 
 **Użytkownik docelowy:** organizatorzy wydarzeń i twórcy kursów sprzedający w systemie early bird (jeden kanał sprzedaży, ceny etapowe). W tej branży nie znaleźliśmy gwarancji ceny.
 
-## Program (zaimplementowany w `programs/bezposrednik/src/`)
+## Program (zaimplementowany w `programs/zwrotka/src/`)
 
 Konta:
 - `Offer` PDA `["offer", seller, offer_id]`: `seller`, `offer_id`, `price`, `floor`, `window_secs`, `event_start`, historia zmian ceny `Vec<PricePoint { ts, price }>` (max 32), `bump`.
@@ -42,7 +42,7 @@ Instrukcje:
 | `claim_difference()` | ktokolwiek | wypłaca `due` kupującemu, bez podpisu sprzedawcy |
 | `release()` | ktokolwiek, po `window_end` | `due` → kupujący, reszta rezerwy → sprzedawca, zamyka `Purchase` (rent → kupujący) |
 
-Podwyżki ceny nic nie zmieniają dla wcześniejszych kupujących. Testy LiteSVM: `programs/bezposrednik/tests/test_price_guarantee.rs`.
+Podwyżki ceny nic nie zmieniają dla wcześniejszych kupujących. Testy LiteSVM: `programs/zwrotka/tests/test_price_guarantee.rs`.
 
 ## Demo (wymóg wyzwania: na żywo, z transakcją w explorerze)
 

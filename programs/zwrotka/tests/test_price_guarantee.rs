@@ -4,7 +4,7 @@ use {
         solana_program::{instruction::Instruction, system_program},
         AccountDeserialize, InstructionData, ToAccountMetas,
     },
-    bezposrednik::{
+    zwrotka::{
         constants::{OFFER_SEED, PURCHASE_SEED},
         state::{Offer, Purchase},
     },
@@ -33,7 +33,7 @@ struct Env {
 fn offer_pda(seller: &Pubkey, offer_id: u64) -> Pubkey {
     Pubkey::find_program_address(
         &[OFFER_SEED, seller.as_ref(), &offer_id.to_le_bytes()],
-        &bezposrednik::id(),
+        &zwrotka::id(),
     )
     .0
 }
@@ -41,7 +41,7 @@ fn offer_pda(seller: &Pubkey, offer_id: u64) -> Pubkey {
 fn purchase_pda(offer: &Pubkey, buyer: &Pubkey) -> Pubkey {
     Pubkey::find_program_address(
         &[PURCHASE_SEED, offer.as_ref(), buyer.as_ref()],
-        &bezposrednik::id(),
+        &zwrotka::id(),
     )
     .0
 }
@@ -52,9 +52,9 @@ impl Env {
         let mut svm = LiteSVM::new();
         let bytes = include_bytes!(concat!(
             env!("CARGO_TARGET_TMPDIR"),
-            "/../deploy/bezposrednik.so"
+            "/../deploy/zwrotka.so"
         ));
-        svm.add_program(bezposrednik::id(), bytes).unwrap();
+        svm.add_program(zwrotka::id(), bytes).unwrap();
         let (seller, ania, bartek) = (Keypair::new(), Keypair::new(), Keypair::new());
         for k in [&seller, &ania, &bartek] {
             svm.airdrop(&k.pubkey(), 10 * SOL).unwrap();
@@ -69,8 +69,8 @@ impl Env {
         };
         env.set_time(1_000_000);
         let ix = Instruction::new_with_bytes(
-            bezposrednik::id(),
-            &bezposrednik::instruction::CreateOffer {
+            zwrotka::id(),
+            &zwrotka::instruction::CreateOffer {
                 offer_id: 1,
                 price: PRICE,
                 floor: FLOOR,
@@ -78,7 +78,7 @@ impl Env {
                 event_start,
             }
             .data(),
-            bezposrednik::accounts::CreateOffer {
+            zwrotka::accounts::CreateOffer {
                 seller: env.seller.pubkey(),
                 offer: env.offer,
                 system_program: system_program::ID,
@@ -134,9 +134,9 @@ impl Env {
 
     fn buy(&mut self, buyer: &Keypair) -> Result<(), String> {
         let ix = Instruction::new_with_bytes(
-            bezposrednik::id(),
-            &bezposrednik::instruction::Buy {}.data(),
-            bezposrednik::accounts::Buy {
+            zwrotka::id(),
+            &zwrotka::instruction::Buy {}.data(),
+            zwrotka::accounts::Buy {
                 buyer: buyer.pubkey(),
                 seller: self.seller.pubkey(),
                 offer: self.offer,
@@ -150,9 +150,9 @@ impl Env {
 
     fn set_price(&mut self, signer: &Keypair, new_price: u64) -> Result<(), String> {
         let ix = Instruction::new_with_bytes(
-            bezposrednik::id(),
-            &bezposrednik::instruction::SetPrice { new_price }.data(),
-            bezposrednik::accounts::SetPrice {
+            zwrotka::id(),
+            &zwrotka::instruction::SetPrice { new_price }.data(),
+            zwrotka::accounts::SetPrice {
                 seller: signer.pubkey(),
                 offer: self.offer,
             }
@@ -164,9 +164,9 @@ impl Env {
     /// `caller` płaci za transakcję; pieniądze zawsze idą do `buyer`.
     fn claim(&mut self, buyer: &Pubkey, caller: &Keypair) -> Result<(), String> {
         let ix = Instruction::new_with_bytes(
-            bezposrednik::id(),
-            &bezposrednik::instruction::ClaimDifference {}.data(),
-            bezposrednik::accounts::ClaimDifference {
+            zwrotka::id(),
+            &zwrotka::instruction::ClaimDifference {}.data(),
+            zwrotka::accounts::ClaimDifference {
                 offer: self.offer,
                 purchase: purchase_pda(&self.offer, buyer),
                 buyer: *buyer,
@@ -178,9 +178,9 @@ impl Env {
 
     fn release(&mut self, buyer: &Pubkey, caller: &Keypair) -> Result<(), String> {
         let ix = Instruction::new_with_bytes(
-            bezposrednik::id(),
-            &bezposrednik::instruction::Release {}.data(),
-            bezposrednik::accounts::Release {
+            zwrotka::id(),
+            &zwrotka::instruction::Release {}.data(),
+            zwrotka::accounts::Release {
                 offer: self.offer,
                 purchase: purchase_pda(&self.offer, buyer),
                 buyer: *buyer,
@@ -337,9 +337,9 @@ fn release_with_wrong_seller_fails() {
     env.buy(&ania).unwrap();
     env.advance(2 * DAY);
     let ix = Instruction::new_with_bytes(
-        bezposrednik::id(),
-        &bezposrednik::instruction::Release {}.data(),
-        bezposrednik::accounts::Release {
+        zwrotka::id(),
+        &zwrotka::instruction::Release {}.data(),
+        zwrotka::accounts::Release {
             offer: env.offer,
             purchase: purchase_pda(&env.offer, &ania.pubkey()),
             buyer: ania.pubkey(),

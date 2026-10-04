@@ -9,10 +9,10 @@ resolution = true
 skip-lint = false
 
 [programs.localnet]
-bezposrednik = "44sG9n516FQKsDNC2uwyKPUKSksyDLH4ypzsVHgJGGB7"
+zwrotka = "44sG9n516FQKsDNC2uwyKPUKSksyDLH4ypzsVHgJGGB7"
 
 [programs.devnet]
-bezposrednik = "44sG9n516FQKsDNC2uwyKPUKSksyDLH4ypzsVHgJGGB7"
+zwrotka = "44sG9n516FQKsDNC2uwyKPUKSksyDLH4ypzsVHgJGGB7"
 
 [provider]
 cluster = "localnet"

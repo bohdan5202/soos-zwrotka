@@ -1,7 +1,7 @@
 # Komendy projektu. Używaj ich zamiast gołego `anchor build` / `anchor test`:
 # Anchor 1.2.0 domyślnie buduje SBPF v3, a z nim testy LiteSVM padają (InvalidAccountData).
 ARCH        ?= v0
-PROGRAM     := bezposrednik
+PROGRAM     := zwrotka
 KEYPAIR_SRC := keys/$(PROGRAM)-program-keypair.json
 KEYPAIR_DST := target/deploy/$(PROGRAM)-keypair.json
 

@@ -1,5 +1,5 @@
-// Klient programu bezposrednik bez SDK Anchora: instrukcje i konta
-// kodujemy ręcznie według target/idl/bezposrednik.json.
+// Klient programu zwrotka bez SDK Anchora: instrukcje i konta
+// kodujemy ręcznie według target/idl/zwrotka.json.
 import {
   Connection,
   PublicKey,
