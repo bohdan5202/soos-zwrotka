@@ -102,3 +102,46 @@ export function PriceChart({
     </figure>
   )
 }
+
+const fmtPct = (v: number) => `${v > 0 ? '+' : '−'}${Math.abs(v).toLocaleString('pl-PL', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`
+
+/** Notowania ceny jak w tabeli giełdowej: od najnowszej zmiany, ze zmianą procentową. */
+export function PriceQuotes({
+  offer, purchases, createdAt, initialPrice = null,
+}: { offer: Offer; purchases: Purchase[]; createdAt: number | null; initialPrice?: bigint | null }) {
+  const start =
+    initialPrice ??
+    (offer.history.length === 0 ? offer.price : purchases.find((p) => p.firstChange === 0)?.paid ?? null)
+  const rows: { ts: number | null; label: string; price: bigint; chg: number | null }[] = []
+  if (start !== null) rows.push({ ts: createdAt, label: 'cena startowa', price: start, chg: null })
+  let prev = start
+  for (const h of offer.history) {
+    const chg = prev !== null && prev > 0n ? (Number(h.price - prev) / Number(prev)) * 100 : null
+    const label = prev === null ? 'zmiana' : h.price < prev ? 'obniżka' : h.price > prev ? 'podwyżka' : 'bez zmian'
+    rows.push({ ts: Number(h.ts), label, price: h.price, chg })
+    prev = h.price
+  }
+  if (rows.length === 0) return null
+  return (
+    <div className="table-wrap">
+      <table className="quotes">
+        <caption>Notowania ceny</caption>
+        <thead>
+          <tr><th>Data</th><th>Zdarzenie</th><th style={{ textAlign: 'right' }}>Cena</th><th style={{ textAlign: 'right' }}>Zmiana</th></tr>
+        </thead>
+        <tbody>
+          {[...rows].reverse().map((r, i) => (
+            <tr key={i}>
+              <td>{r.ts ? fmtTime(r.ts) : '—'}</td>
+              <td>{r.label}</td>
+              <td className="q-price">{fmtZl(r.price)}</td>
+              <td className={`q-chg ${r.chg === null || r.chg === 0 ? 'muted' : r.chg < 0 ? 'down' : 'up'}`}>
+                {r.chg === null || r.chg === 0 ? '—' : fmtPct(r.chg)}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}

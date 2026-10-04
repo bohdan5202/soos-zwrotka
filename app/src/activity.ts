@@ -157,6 +157,21 @@ export const fetchActivity = (c: Connection, offer: PublicKey) =>
   once(c, offer, 200).then((evs) => evs.filter((e) => e.offer === offer.toBase58()));
 export const fetchWalletActivity = (c: Connection, wallet: PublicKey, limit = 60) => once(c, wallet, limit);
 
+/** Etykiety zdarzeń w kronice (zamiast ikon) i klasa koloru. */
+export const KIND: Record<EventKind, { label: string; cls: string }> = {
+  create: { label: "oferta", cls: "k-create" },
+  buy: { label: "zakup", cls: "k-buy" },
+  price: { label: "cena", cls: "k-price" },
+  refund: { label: "zwrot", cls: "k-refund" },
+  release: { label: "rozliczenie", cls: "k-release" },
+  sellerRefund: { label: "anulowanie", cls: "k-refund" },
+  closeSales: { label: "koniec", cls: "k-price" },
+};
+
+/** Znacznik czasu w kronice: 04.10.26, 08:41. */
+export const fmtStamp = (ts: number) =>
+  new Date(ts * 1000).toLocaleString("pl-PL", { day: "2-digit", month: "2-digit", year: "2-digit", hour: "2-digit", minute: "2-digit" });
+
 export type Role = "seller" | "buyer";
 
 /** Rola portfela w zdarzeniu: sprzedawca, kupujący albo obie (np. test na sobie). */

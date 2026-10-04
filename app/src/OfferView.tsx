@@ -2,10 +2,10 @@ import { Fragment, useMemo, useState } from 'react'
 import { useConnection, useWallet } from '@solana/wallet-adapter-react'
 import { WalletMultiButton } from '@solana/wallet-adapter-react-ui'
 import type { PublicKey } from '@solana/web3.js'
-import { totals, type ActivityEvent } from './activity'
+import { KIND, fmtStamp, totals, type ActivityEvent } from './activity'
 import type { Send } from './shell'
 import { LineChart, MoneySplit, UnlockSchedule, fmtIn } from './charts'
-import { PriceChart } from './PriceChart'
+import { PriceChart, PriceQuotes } from './PriceChart'
 import { ProtectionMeter, Stepper, type StepState } from './funnel'
 import {
   buyIx,
@@ -96,7 +96,7 @@ export function OfferView(p: Props & { tab: string; onTab: (slug: string) => voi
     <>
       <ProductCard offer={p.offer} name={p.name} nameUnverified={!!p.nameUnverified} isSeller={p.isSeller} />
       {p.offer.closed && (
-        <div className="notice">⛔ Sprzedaż zakończona: nowych zakupów nie ma. Istniejące zakupy i ich rezerwy działają dalej.</div>
+        <div className="notice">Sprzedaż zakończona: nowych zakupów nie ma. Istniejące zakupy i ich rezerwy działają dalej.</div>
       )}
       <nav className="tabs" role="tablist">
         {tabs.map((t) => (
@@ -134,7 +134,7 @@ function ProductCard({ offer, name, nameUnverified, isSeller }: { offer: Offer; 
           <div className="eyebrow">{isSeller ? 'Twoja oferta' : 'Oferta'}</div>
           <h1>{name}</h1>
           {nameUnverified && (
-            <div className="muted small">⚠️ Nazwa pochodzi z linku, nie z blockchaina: sprzedawca jej nie potwierdził.</div>
+            <div className="muted small">Nazwa pochodzi z linku, nie z blockchaina: sprzedawca jej nie potwierdził.</div>
           )}
         </div>
         <div className="price-box">
@@ -143,7 +143,7 @@ function ProductCard({ offer, name, nameUnverified, isSeller }: { offer: Offer; 
         </div>
       </div>
       <div className="badge">
-        <span>🛡️</span>
+        <span></span>
         <div>
           <b>Gwarancja ceny{pct > 0 && <> do {pct}%</>}</b>
           <div className="small">
@@ -191,7 +191,7 @@ function SellerOverview({ offer, purchases, requests, events, now, busy, send, g
     <>
       {requests.size > 0 && (
         <div className="notice warn-notice">
-          📩 Prośby o zwrot: <b>{requests.size}</b>.{' '}
+          Prośby o zwrot: <b>{requests.size}</b>.{' '}
           <button className="link" onClick={() => goTo('kupujacy')}>Zobacz kupujących →</button>
         </div>
       )}
@@ -402,6 +402,12 @@ function Analytics({ offer, purchases, events, createdAt, now, isSeller }: Props
           now={now}
           initialPrice={events?.find((e) => e.kind === 'create')?.amount ?? null}
         />
+        <PriceQuotes
+          offer={offer}
+          purchases={purchases}
+          createdAt={createdAt}
+          initialPrice={events?.find((e) => e.kind === 'create')?.amount ?? null}
+        />
       </section>
       <div className="grid2 even">
         <section className="card">
@@ -492,7 +498,7 @@ function RequestRefundCard({
   if (request) {
     return (
       <section className="card notice-card">
-        <b>📩 Prośba o zwrot wysłana</b>
+        <b>Prośba o zwrot wysłana</b>
         <p className="muted small">
           „{request.reason || 'bez powodu'}” · {fmtDate(request.requestedAt)}. Sprzedawca widzi ją w swoim panelu. Jeśli się
           zgodzi, pieniądze wrócą automatycznie z rezerwy i jego dopłaty.
@@ -556,9 +562,9 @@ function BuyerPanel({ offer, mine, requests, now, busy, send }: Props) {
             <div className="muted small">Cena dziś</div>
             <div className="price">{fmtZl(offer.price)}</div>
             <ul className="checks">
-              <li>✓ Ochrona do {fmtZl(offer.price - toSeller)} przez {cappedByEvent ? `${fmtLeft(guaranteeSecs)} (do startu wydarzenia)` : fmtDuration(Number(offer.windowSecs))}</li>
-              <li>✓ Rezerwa zablokowana w programie, nie u sprzedawcy</li>
-              <li>✓ Zwrot jednym kliknięciem albo automatycznie</li>
+              <li>Ochrona do {fmtZl(offer.price - toSeller)} przez {cappedByEvent ? `${fmtLeft(guaranteeSecs)} (do startu wydarzenia)` : fmtDuration(Number(offer.windowSecs))}</li>
+              <li>Rezerwa zablokowana w programie, nie u sprzedawcy</li>
+              <li>Zwrot jednym kliknięciem albo automatycznie</li>
             </ul>
             {offer.closed ? (
               <button className="big wide" disabled>Sprzedaż zakończona</button>
@@ -598,7 +604,7 @@ function BuyerPanel({ offer, mine, requests, now, busy, send }: Props) {
         <Stat label="Już odebrano" value={fmtZl(mine.claimed)} />
       </div>
       <div className={`due ${d > 0n ? 'yes' : ''}`}>
-        {d > 0n ? <>💸 {fmtZl(d)} do odebrania</> : 'Cena nie spadła: nic do odebrania'}
+        {d > 0n ? <>{fmtZl(d)} do odebrania</> : 'Cena nie spadła: nic do odebrania'}
       </div>
       <div className="inline">
         <button className="big" disabled={busy || d === 0n} onClick={() => send(`Zwrot różnicy ${fmtZl(d)}`, claimIx(offer.address, mine))}>
@@ -661,7 +667,7 @@ function PurchaseList({ offer, purchases, requests, now, busy, send, isSeller }:
                   <tr className={req ? 'has-request' : ''}>
                     <td>
                       <a href={explorerAddr(p.buyer)} target="_blank" rel="noreferrer">{short(p.buyer)}</a>
-                      {req && <div className="req-badge" title={req.reason}>📩 prosi o zwrot{req.reason ? `: „${req.reason}”` : ''}</div>}
+                      {req && <div className="req-badge" title={req.reason}>prosi o zwrot{req.reason ? `: „${req.reason}”` : ''}</div>}
                     </td>
                     <td>{fmtTime(Number(p.boughtAt))}</td>
                     <td>{fmtZl(p.paid)}</td>
@@ -749,15 +755,6 @@ function RefundForm({
 
 // ---------- Historia ----------
 
-const KIND: Record<ActivityEvent['kind'], { icon: string; cls: string }> = {
-  create: { icon: '✨', cls: 'k-create' },
-  buy: { icon: '🛒', cls: 'k-buy' },
-  price: { icon: '🏷️', cls: 'k-price' },
-  refund: { icon: '💸', cls: 'k-refund' },
-  release: { icon: '🔓', cls: 'k-release' },
-  sellerRefund: { icon: '↩️', cls: 'k-refund' },
-  closeSales: { icon: '⛔', cls: 'k-price' },
-}
 
 function describe(e: ActivityEvent, offer: Offer) {
   const isSellerActor = e.actor === offer.seller.toBase58()
@@ -796,12 +793,13 @@ function EventList({ events, offer }: { events: ActivityEvent[] | null; offer?: 
     <ul className="events">
       {events.map((e, i) => (
         <li key={`${e.sig}${i}`} className={`${KIND[e.kind].cls} ${e.failed ? 'failed' : ''}`}>
-          <span className="ev-icon">{KIND[e.kind].icon}</span>
+          <time className="ev-time">{fmtStamp(e.ts)}</time>
+          <span className="ev-kind">{KIND[e.kind].label}</span>
           <div className="ev-body">
-            <div>{offer ? describe(e, offer) : e.kind}</div>
-            <div className="muted small">
-              {fmtDate(e.ts)} · <a href={explorerTx(e.sig)} target="_blank" rel="noreferrer">transakcja ↗</a>
-              {e.failed && ' · nieudana'}
+            <div>
+              {offer ? describe(e, offer) : e.kind}{' '}
+              <a className="small" href={explorerTx(e.sig)} target="_blank" rel="noreferrer">tx ↗</a>
+              {e.failed && <span className="muted small"> · nieudana</span>}
             </div>
           </div>
         </li>
@@ -813,8 +811,8 @@ function EventList({ events, offer }: { events: ActivityEvent[] | null; offer?: 
 function ActivityFeed({ events, offer }: { events: ActivityEvent[] | null; offer: Offer }) {
   return (
     <section className="card">
-      <h2>Historia on-chain</h2>
-      <p className="muted small">Każde zdarzenie to transakcja w Solana Explorer. Tej historii nikt nie może edytować.</p>
+      <h2>Kronika on-chain</h2>
+      <p className="muted small">Każdy wpis to transakcja w Solana Explorer. Tej historii nikt nie może edytować.</p>
       <EventList events={events ? [...events].reverse() : null} offer={offer} />
     </section>
   )

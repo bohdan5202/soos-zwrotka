@@ -114,6 +114,11 @@ export function Catalog() {
       {items && shown.length === 0 && <section className="card center muted">Brak ofert dla tych filtrów.</section>}
 
       <div className="catalog">
+        {shown.length > 0 && (
+          <div className="catalog-head" aria-hidden="true">
+            <span>Oferta</span><span>Cena</span><span>Ochrona</span><span>W rezerwie</span><span />
+          </div>
+        )}
         {shown.map(({ offer: o, purchases }) => {
           const addr = o.address.toBase58()
           const maxRefund = o.price > o.floor ? o.price - o.floor : 0n
@@ -124,22 +129,28 @@ export function Catalog() {
           const dropped = o.history.length > 0
           const mine = publicKey?.equals(o.seller)
           return (
-            <Link key={addr} to={`/oferta/${addr}`} className="product-card">
-              <div className="pc-top">
-                {pct > 0 ? <span className="pill ok">🛡️ ochrona do {pct}%</span> : <span className="pill">bez ochrony</span>}
-                {o.closed && <span className="pill">sprzedaż zakończona</span>}
-                {mine && <span className="role seller-role mini">Twoja</span>}
+            <Link key={addr} to={`/oferta/${addr}`} className="product-row">
+              <div className="pr-name">
+                <h3>{nameOf(o)}</h3>
+                <div className="pr-tags">
+                  {o.closed && <span className="pill">sprzedaż zakończona</span>}
+                  {mine && <span className="role seller-role mini">Twoja</span>}
+                  {owed > 0n && <span className="pill ok">do wypłaty {fmtZl(owed)}</span>}
+                </div>
               </div>
-              <h3>{nameOf(o)}</h3>
-              <div className="pc-price">{fmtZl(o.price)}</div>
-              {dropped && <div className="muted small">zmian ceny: {o.history.length}</div>}
-              <ul className="pc-facts">
-                <li>Okno: {o.windowSecs > 0n ? fmtDuration(Number(o.windowSecs)) : '—'}{o.eventStart > 0n && ' / do wydarzenia'}</li>
-                <li>Aktywne zakupy: <b>{purchases.length}</b>{active < purchases.length && ` (${active} w oknie)`}</li>
-                <li>W rezerwie: <b>{fmtZl(locked)}</b></li>
-                {owed > 0n && <li className="ok-text">Do wypłaty kupującym: {fmtZl(owed)}</li>}
-              </ul>
-              <span className="pc-cta">Zobacz ofertę →</span>
+              <div className="pr-num">
+                {fmtZl(o.price)}
+                <small>{dropped ? `zmian ceny: ${o.history.length}` : 'cena startowa'}</small>
+              </div>
+              <div className={`pr-num ${pct > 0 ? 'ok' : ''}`}>
+                {pct > 0 ? `do ${pct}%` : '—'}
+                <small>okno {o.windowSecs > 0n ? fmtDuration(Number(o.windowSecs)) : 'do wydarzenia'}{o.windowSecs > 0n && o.eventStart > 0n && ', max do wydarzenia'}</small>
+              </div>
+              <div className="pr-num">
+                {fmtZl(locked)}
+                <small>zakupy: {purchases.length}{active < purchases.length && ` (${active} w oknie)`}</small>
+              </div>
+              <span className="pr-cta" aria-hidden="true">→</span>
             </Link>
           )
         })}
