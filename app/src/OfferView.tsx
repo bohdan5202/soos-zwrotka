@@ -15,6 +15,7 @@ import {
   explorerAddr,
   explorerTx,
   fmtZl,
+  minRefund,
   refundPurchaseIx,
   releaseIx,
   requestRefundIx,
@@ -529,6 +530,8 @@ function BuyerPanel({ offer, mine, requests, now, busy, send }: Props) {
 
   if (!mine) {
     const toSeller = offer.price < offer.floor ? offer.price : offer.floor
+    // Po starcie wydarzenia zakup nie miałby gwarancji: program go odrzuca.
+    const eventStarted = offer.eventStart > 0n && Number(offer.eventStart) <= now
     return (
       <>
         <BuyerSteps connected={!!publicKey} bought={false} active={false} refunded={false} />
@@ -546,6 +549,8 @@ function BuyerPanel({ offer, mine, requests, now, busy, send }: Props) {
             </ul>
             {offer.closed ? (
               <button className="big wide" disabled>Sprzedaż zakończona</button>
+            ) : eventStarted ? (
+              <button className="big wide" disabled>Wydarzenie już się zaczęło</button>
             ) : publicKey ? (
               <button className="big wide" disabled={busy} onClick={() => send(`Zakup za ${fmtZl(offer.price)}`, buyIx(publicKey, offer))}>
                 Kup z ochroną ceny
@@ -688,13 +693,12 @@ function RefundForm({
 }: { offer: Offer; purchase: Purchase; hasRequest: boolean; busy: boolean; send: Send; onDone: () => void }) {
   const { publicKey } = useWallet()
   const max = p.paid - p.claimed
-  const min = due(p, offer)
+  const min = minRefund(p)
   const [amountZl, setAmountZl] = useState(toZl(max))
   const amount = toLamports(amountZl)
   const valid = amount >= min && amount <= max
   const topUp = sellerTopUp(p, amount)
   const fromReserve = amount - topUp
-  const back = p.reserve - p.claimed - fromReserve
   return (
     <div className="refund-form">
       <div className="inline">
@@ -702,16 +706,17 @@ function RefundForm({
         <input type="number" className="num" value={amountZl} onChange={(e) => setAmountZl(+e.target.value)} />
         <span>zł</span>
         <button className="link" onClick={() => setAmountZl(toZl(max))}>całość ({fmtZl(max)})</button>
-        {min > 0n && <button className="link" onClick={() => setAmountZl(toZl(min))}>minimum ({fmtZl(min)})</button>}
+        {min > 0n && <button className="link" onClick={() => setAmountZl(toZl(min))}>minimum: cała rezerwa ({fmtZl(min)})</button>}
       </div>
       <p className="small">
         {valid ? (
           <>
-            Z rezerwy: <b>{fmtZl(fromReserve)}</b> · Twoja dopłata: <b>{fmtZl(topUp)}</b>
-            {back > 0n && <> · wróci do Ciebie {fmtZl(back > 0n ? back : 0n)} rezerwy</>}. Zakup zostanie zamknięty.
+            Z rezerwy: <b>{fmtZl(fromReserve)}</b> · Twoja dopłata: <b>{fmtZl(topUp)}</b>. Zakup zostanie zamknięty.
           </>
         ) : (
-          <span className="err-text">Kwota musi być między {fmtZl(min)} (należność z reguły ceny) a {fmtZl(max)}.</span>
+          <span className="err-text">
+            Kwota musi być między {fmtZl(min)} (cała rezerwa: przy anulowaniu trafia do kupującego) a {fmtZl(max)}.
+          </span>
         )}
       </p>
       <button

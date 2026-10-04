@@ -68,10 +68,15 @@ impl Env {
             offer,
         };
         env.set_time(1_000_000);
+        env.create_offer(1, window_secs, event_start).unwrap();
+        env
+    }
+
+    fn create_offer(&mut self, offer_id: u64, window_secs: i64, event_start: i64) -> Result<(), String> {
         let ix = Instruction::new_with_bytes(
             zwrotka::id(),
             &zwrotka::instruction::CreateOffer {
-                offer_id: 1,
+                offer_id,
                 price: PRICE,
                 floor: FLOOR,
                 window_secs,
@@ -79,14 +84,13 @@ impl Env {
             }
             .data(),
             zwrotka::accounts::CreateOffer {
-                seller: env.seller.pubkey(),
-                offer: env.offer,
+                seller: self.seller.pubkey(),
+                offer: offer_pda(&self.seller.pubkey(), offer_id),
                 system_program: system_program::ID,
             }
             .to_account_metas(None),
         );
-        env.send(ix, &env.seller.insecure_clone()).unwrap();
-        env
+        self.send(ix, &self.seller.insecure_clone())
     }
 
     fn send(&mut self, ix: Instruction, payer: &Keypair) -> Result<(), String> {
@@ -132,10 +136,16 @@ impl Env {
         Purchase::try_deserialize(&mut acc.data.as_slice()).unwrap()
     }
 
+    /// Zakup po aktualnej cenie (tej, którą kupujący widzi).
     fn buy(&mut self, buyer: &Keypair) -> Result<(), String> {
+        let price = self.offer_state().price;
+        self.buy_max(buyer, price)
+    }
+
+    fn buy_max(&mut self, buyer: &Keypair, max_price: u64) -> Result<(), String> {
         let ix = Instruction::new_with_bytes(
             zwrotka::id(),
-            &zwrotka::instruction::Buy {}.data(),
+            &zwrotka::instruction::Buy { max_price }.data(),
             zwrotka::accounts::Buy {
                 buyer: buyer.pubkey(),
                 seller: self.seller.pubkey(),
@@ -269,6 +279,23 @@ fn two_drops_claim_cumulatively() {
 }
 
 #[test]
+fn buy_fails_if_seller_raised_price_above_what_buyer_saw() {
+    let mut env = Env::new(30 * DAY, 0);
+    let (ania, bartek, seller) = (
+        env.ania.insecure_clone(),
+        env.bartek.insecure_clone(),
+        env.seller.insecure_clone(),
+    );
+    // Ania widzi 1000, sprzedawca podnosi cenę tuż przed jej zakupem.
+    env.set_price(&seller, SOL * 12 / 10).unwrap();
+    assert!(env.buy_max(&ania, PRICE).is_err());
+    // Obniżka przed zakupem nie przeszkadza: kupujący płaci mniej, niż akceptował.
+    env.set_price(&seller, SOL * 9 / 10).unwrap();
+    env.buy_max(&bartek, PRICE).unwrap();
+    assert_eq!(env.purchase_state(&bartek.pubkey()).paid, SOL * 9 / 10);
+}
+
+#[test]
 fn only_seller_can_set_price() {
     let mut env = Env::new(30 * DAY, 0);
     let bartek = env.bartek.insecure_clone();
@@ -298,6 +325,19 @@ fn event_start_ends_guarantee_earlier() {
     env.advance(6 * DAY);
     env.set_price(&seller, SOL / 2).unwrap();
     assert!(env.claim(&ania.pubkey(), &ania).is_err());
+}
+
+#[test]
+fn no_offer_with_event_in_the_past_and_no_sales_after_event_start() {
+    let event_start = 1_000_000 + 5 * DAY;
+    let mut env = Env::new(30 * DAY, event_start);
+    assert!(env.create_offer(2, 30 * DAY, env.now() - 1).is_err());
+    assert!(env.create_offer(3, 30 * DAY, env.now()).is_err());
+
+    // Po starcie wydarzenia zakup nie miałby gwarancji, więc program go odrzuca.
+    let ania = env.ania.insecure_clone();
+    env.set_time(event_start);
+    assert!(env.buy(&ania).is_err());
 }
 
 #[test]
@@ -432,31 +472,41 @@ fn full_refund_returns_everything_and_closes_purchase() {
 }
 
 #[test]
-fn partial_refund_uses_reserve_first_and_returns_rest_to_seller() {
+fn partial_refund_gives_whole_reserve_and_seller_tops_up() {
     let mut env = Env::new(30 * DAY, 0);
     let (ania, seller) = (env.ania.insecure_clone(), env.seller.insecure_clone());
     env.buy(&ania).unwrap();
+    let purchase = purchase_pda(&env.offer, &ania.pubkey());
+    let rent = env.balance(&purchase) - (PRICE - FLOOR);
     let ania_before = env.balance(&ania.pubkey());
     let seller_before = env.balance(&seller.pubkey());
 
-    // Zwrot 100 zł z rezerwy 200: sprzedawca nic nie dopłaca, 100 zł rezerwy wraca do niego.
-    env.refund(&seller, &ania.pubkey(), SOL / 10).unwrap();
+    // Zwrot 300 zł: cała rezerwa 200 + 100 dopłaty sprzedawcy.
+    env.refund(&seller, &ania.pubkey(), SOL * 3 / 10).unwrap();
 
-    let purchase = purchase_pda(&env.offer, &ania.pubkey());
     assert!(env.svm.get_account(&purchase).map_or(true, |a| a.lamports == 0));
-    assert!(env.balance(&ania.pubkey()) - ania_before >= SOL / 10);
-    assert_eq!(env.balance(&seller.pubkey()) + 5000 - seller_before, SOL / 10);
+    assert_eq!(env.balance(&ania.pubkey()) - ania_before, SOL * 3 / 10 + rent);
+    assert_eq!(seller_before - env.balance(&seller.pubkey()), SOL / 10 + 5000);
 }
 
 #[test]
-fn refund_cannot_be_below_what_price_rule_owes() {
+fn refund_cannot_take_back_the_reserve() {
     let mut env = Env::new(30 * DAY, 0);
     let (ania, seller) = (env.ania.insecure_clone(), env.seller.insecure_clone());
     env.buy(&ania).unwrap();
-    env.set_price(&seller, SOL * 85 / 100).unwrap(); // należy się 150
-    assert!(env.refund(&seller, &ania.pubkey(), SOL / 10).is_err()); // 100 < 150
+    // „Anulowanie” za 0 albo za część rezerwy oddałoby resztę rezerwy sprzedawcy
+    // i odebrało Ani gwarancję przed obniżką ceny.
+    assert!(env.refund(&seller, &ania.pubkey(), 0).is_err());
+    assert!(env.refund(&seller, &ania.pubkey(), SOL / 10).is_err()); // 100 < rezerwa 200
     assert!(env.refund(&seller, &ania.pubkey(), PRICE + 1).is_err()); // więcej niż zapłaciła
-    env.refund(&seller, &ania.pubkey(), SOL * 15 / 100).unwrap();
+
+    // Po obniżce i odebraniu 150 zostaje 50 rezerwy: to nowe minimum.
+    env.set_price(&seller, SOL * 85 / 100).unwrap();
+    env.claim(&ania.pubkey(), &ania).unwrap();
+    assert!(env.refund(&seller, &ania.pubkey(), SOL * 5 / 100 - 1).is_err());
+    let before = env.balance(&ania.pubkey());
+    env.refund(&seller, &ania.pubkey(), SOL * 5 / 100).unwrap();
+    assert!(env.balance(&ania.pubkey()) - before >= SOL * 5 / 100);
 }
 
 #[test]

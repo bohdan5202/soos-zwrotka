@@ -376,7 +376,8 @@ export function createOfferIx(
   });
 }
 
-export function buyIx(buyer: PublicKey, offer: Offer) {
+/** `maxPrice`: cena, którą kupujący zaakceptował (domyślnie ta pokazana w UI). */
+export function buyIx(buyer: PublicKey, offer: Offer, maxPrice: bigint = offer.price) {
   return new TransactionInstruction({
     programId: PROGRAM_ID,
     keys: [
@@ -386,7 +387,7 @@ export function buyIx(buyer: PublicKey, offer: Offer) {
       { pubkey: purchasePda(offer.address, buyer), isSigner: false, isWritable: true },
       { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
     ],
-    data: concat(DISC.buy),
+    data: concat(DISC.buy, u64(maxPrice)),
   });
 }
 
@@ -459,7 +460,7 @@ export function requestRefundIx(buyer: PublicKey, purchase: PublicKey, reason: s
 }
 
 /**
- * Sprzedawca oddaje kupującemu `amount`: najpierw z rezerwy, resztę dopłaca sam.
+ * Sprzedawca oddaje kupującemu `amount`: całą pozostałą rezerwę, resztę dopłaca sam.
  * Zakup (i ewentualna prośba o zwrot) się zamyka. Brak prośby = PROGRAM_ID w miejscu
  * opcjonalnego konta (konwencja Anchora).
  */
@@ -479,6 +480,9 @@ export function refundPurchaseIx(seller: PublicKey, offer: PublicKey, p: Purchas
     data: concat(DISC.refundPurchase, u64(amount)),
   });
 }
+
+/** Najmniejszy zwrot przy anulowaniu: cała pozostała rezerwa (program nie odda jej sprzedawcy). */
+export const minRefund = (p: Purchase) => p.reserve - p.claimed
 
 /** Ile sprzedawca dopłaci ze swojego portfela przy zwrocie `amount`. */
 export function sellerTopUp(p: Purchase, amount: bigint) {

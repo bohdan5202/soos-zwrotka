@@ -9,9 +9,9 @@ use crate::{
 };
 
 /// Sprzedawca anuluje jeden zakup i oddaje kupującemu `amount` (całość albo część).
-/// Najpierw idzie rezerwa zakupu, resztę dopłaca sprzedawca ze swojego portfela.
-/// Niewykorzystana rezerwa wraca do sprzedawcy, a zakup się zamyka (rent → kupujący).
-/// Nie da się oddać mniej, niż kupującemu już należy się z reguły ceny.
+/// Cała pozostała rezerwa idzie do kupującego, resztę dopłaca sprzedawca ze swojego portfela.
+/// Zakup się zamyka (rent → kupujący). Nie da się oddać mniej niż pozostała rezerwa:
+/// inaczej sprzedawca mógłby „anulować” zakup za 0 i zabrać rezerwę przed obniżką ceny.
 #[derive(Accounts)]
 pub struct RefundPurchase<'info> {
     #[account(mut)]
@@ -36,7 +36,7 @@ pub struct RefundPurchase<'info> {
 
 pub fn handle_refund_purchase(ctx: Context<RefundPurchase>, amount: u64) -> Result<()> {
     let purchase = &ctx.accounts.purchase;
-    let due = purchase.due(&ctx.accounts.offer);
+    // Pozostała rezerwa zawsze pokrywa należność z reguły ceny (`due <= left`).
     let left = purchase
         .reserve
         .checked_sub(purchase.claimed)
@@ -45,14 +45,12 @@ pub fn handle_refund_purchase(ctx: Context<RefundPurchase>, amount: u64) -> Resu
         .paid
         .checked_sub(purchase.claimed)
         .ok_or(ErrorCode::Overflow)?;
-    require!(amount >= due, ErrorCode::RefundBelowDue);
+    require!(amount >= left, ErrorCode::RefundBelowReserve);
     require!(amount <= max, ErrorCode::RefundAbovePaid);
 
-    let from_reserve = amount.min(left);
-    let from_seller = amount - from_reserve;
-    let back_to_seller = left - from_reserve;
+    let from_seller = amount - left;
 
-    // Najpierw dopłata sprzedawcy (CPI), potem ręczne przesunięcia z konta programu.
+    // Najpierw dopłata sprzedawcy (CPI), potem ręczne przesunięcie z konta programu.
     if from_seller > 0 {
         transfer(
             CpiContext::new(
@@ -65,20 +63,19 @@ pub fn handle_refund_purchase(ctx: Context<RefundPurchase>, amount: u64) -> Resu
             from_seller,
         )?;
     }
-    let purchase_info = ctx.accounts.purchase.to_account_info();
-    if from_reserve > 0 {
-        move_lamports(&purchase_info, &ctx.accounts.buyer.to_account_info(), from_reserve)?;
-    }
-    if back_to_seller > 0 {
-        move_lamports(&purchase_info, &ctx.accounts.seller.to_account_info(), back_to_seller)?;
+    if left > 0 {
+        move_lamports(
+            &ctx.accounts.purchase.to_account_info(),
+            &ctx.accounts.buyer.to_account_info(),
+            left,
+        )?;
     }
 
     msg!(
-        "Refund by seller: {} to buyer ({} from reserve, {} from seller), {} back to seller",
+        "Refund by seller: {} to buyer ({} from reserve, {} from seller)",
         amount,
-        from_reserve,
-        from_seller,
-        back_to_seller
+        left,
+        from_seller
     );
     Ok(())
 }

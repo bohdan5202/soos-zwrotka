@@ -32,6 +32,10 @@ pub fn handle_create_offer(
         window_secs > 0 || event_start > 0,
         ErrorCode::NoGuaranteeWindow
     );
+    require!(
+        event_start <= 0 || event_start > Clock::get()?.unix_timestamp,
+        ErrorCode::EventInPast
+    );
 
     let offer = &mut ctx.accounts.offer;
     offer.seller = ctx.accounts.seller.key();

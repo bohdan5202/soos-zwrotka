@@ -26,9 +26,12 @@ pub struct Buy<'info> {
     pub system_program: Program<'info, System>,
 }
 
-pub fn handle_buy(ctx: Context<Buy>) -> Result<()> {
+/// `max_price`: cena, którą kupujący widział i zaakceptował. Sprzedawca nie podniesie jej
+/// tuż przed wykonaniem zakupu.
+pub fn handle_buy(ctx: Context<Buy>, max_price: u64) -> Result<()> {
     let offer = &ctx.accounts.offer;
     require!(!offer.closed, ErrorCode::SalesClosed);
+    require!(offer.price <= max_price, ErrorCode::PriceAboveMax);
     let now = Clock::get()?.unix_timestamp;
 
     // Sprzedawca od razu dostaje floor (albo całą cenę, jeśli spadła poniżej floor).
@@ -46,6 +49,8 @@ pub fn handle_buy(ctx: Context<Buy>) -> Result<()> {
             .ok_or(ErrorCode::Overflow)?,
         _ => offer.event_start,
     };
+    // Po starcie wydarzenia zakup nie miałby żadnej gwarancji.
+    require!(window_end > now, ErrorCode::GuaranteeEnded);
 
     let system_program = ctx.accounts.system_program.key();
     transfer(
