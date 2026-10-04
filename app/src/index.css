@@ -371,3 +371,21 @@ tr.has-request td { background: var(--warn-soft); }
 .refund-row td { background: var(--bg); white-space: normal; }
 .refund-form { display: flex; flex-direction: column; gap: 8px; padding: 6px 0; }
 .refund-form p { margin: 0; }
+
+/* ---------- panel i statystyki ---------- */
+.hero.compact { padding: 20px 4px 4px; }
+.hero.compact h1 { font-size: clamp(1.5rem, 3vw, 2rem); }
+.kpis { margin: 8px 0 18px; }
+.pipeline { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 6px 0 14px; }
+@media (max-width: 760px) { .pipeline { grid-template-columns: 1fr 1fr; } }
+.stage { display: flex; flex-direction: column; gap: 2px; padding: 14px; border-radius: 12px; border: 1px solid var(--border); background: var(--bg); }
+.stage b { font-size: 1.8rem; font-variant-numeric: tabular-nums; }
+.stage span { font-weight: 600; }
+.stage small { color: var(--muted); font-size: 0.78rem; }
+.s-active { border-top: 3px solid var(--ok); }
+.s-settle { border-top: 3px solid var(--warn); }
+.s-request { border-top: 3px solid var(--err); }
+.s-done { border-top: 3px solid var(--muted); }
+.actions-row { margin-bottom: 6px; }
+.req-list { list-style: none; padding: 0; margin: 10px 0 0; display: grid; gap: 6px; font-size: 0.9rem; }
+.req-list li { background: var(--warn-soft); border-radius: 8px; padding: 8px 12px; }

@@ -3,6 +3,8 @@ import { Shell } from './shell'
 import { Home } from './pages/Home'
 import { Seller } from './pages/Seller'
 import { Catalog } from './pages/Catalog'
+import { Panel } from './pages/Panel'
+import { Stats } from './pages/Stats'
 import { OfferPage } from './pages/OfferPage'
 import { WalletPage } from './pages/WalletPage'
 import { Account, LegacyRedirect, NotFound } from './pages/misc'
@@ -16,6 +18,8 @@ export default function App() {
       <Route element={<Shell />}>
         <Route index element={legacy ? <LegacyRedirect /> : <Home />} />
         <Route path="katalog" element={<Catalog />} />
+        <Route path="panel" element={<Panel />} />
+        <Route path="statystyki" element={<Stats />} />
         <Route path="sprzedawca" element={<Seller />} />
         <Route path="oferta/:address" element={<OfferPage />} />
         <Route path="oferta/:address/:tab" element={<OfferPage />} />

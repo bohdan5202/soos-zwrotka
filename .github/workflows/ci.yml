@@ -1,0 +1,90 @@
+# CI: frontend (build) i program (build + testy LiteSVM) przy każdym pushu i PR.
+# Deploy frontendu robi Vercel sam (integracja z GitHubem), więc tu go nie ma.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  frontend:
+    name: Frontend (build)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+      - run: npm ci
+      - run: npm run build
+
+  program:
+    name: Program (build + testy)
+    runs-on: ubuntu-latest
+    env:
+      SOLANA_VERSION: 3.1.10
+      ANCHOR_VERSION: 1.2.0
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Pakiety systemowe
+        run: sudo apt-get update && sudo apt-get install -y pkg-config libssl-dev libudev-dev
+
+      - name: Cache (cargo, avm, Solana, target)
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin
+            ~/.cargo/registry
+            ~/.cargo/git
+            ~/.avm
+            ~/.local/share/solana
+            ~/.cache/solana
+            target
+          key: zwrotka-${{ runner.os }}-sol${{ env.SOLANA_VERSION }}-anchor${{ env.ANCHOR_VERSION }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
+          restore-keys: |
+            zwrotka-${{ runner.os }}-sol${{ env.SOLANA_VERSION }}-anchor${{ env.ANCHOR_VERSION }}-
+
+      - name: PATH
+        run: |
+          echo "$HOME/.local/share/solana/install/active_release/bin" >> "$GITHUB_PATH"
+          echo "$HOME/.avm/bin" >> "$GITHUB_PATH"
+          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+
+      - name: Rust (wersja z rust-toolchain.toml)
+        run: rustup show
+
+      - name: Solana CLI
+        run: |
+          if ! command -v solana >/dev/null || ! solana --version | grep -q "$SOLANA_VERSION"; then
+            sh -c "$(curl -sSfL https://release.anza.xyz/v${SOLANA_VERSION}/install)"
+          fi
+          solana --version
+
+      - name: Anchor (avm)
+        run: |
+          if ! command -v avm >/dev/null; then
+            cargo install --git https://github.com/otter-sec/anchor --tag v${ANCHOR_VERSION} avm --locked
+          fi
+          avm install ${ANCHOR_VERSION} || true
+          avm use ${ANCHOR_VERSION}
+          anchor --version
+
+      - name: Portfel testowy (Anchor.toml go wskazuje)
+        run: |
+          mkdir -p ~/.config/solana
+          [ -f ~/.config/solana/id.json ] || solana-keygen new --no-bip39-passphrase --silent -o ~/.config/solana/id.json
+
+      - name: Build + testy
+        run: make test
