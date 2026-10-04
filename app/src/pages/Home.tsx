@@ -18,10 +18,10 @@ export function Home() {
           <div className="cta-row">
             <Link className="btn big" to="/katalog">Zobacz oferty z ochroną</Link>
             <Link className="btn secondary big" to="/sprzedawca">Jestem sprzedawcą</Link>
-            <a className="watch-link" href="#nagranie">
+            <Link className="watch-link" to={{ hash: '#nagranie' }}>
               <span className="watch-icon" aria-hidden="true" />
               Obejrzyj, jak to działa (3 min)
-            </a>
+            </Link>
           </div>
           <ul className="trust">
             <li>Rezerwa w programie, nie u sprzedawcy</li>

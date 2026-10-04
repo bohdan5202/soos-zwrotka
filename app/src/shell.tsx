@@ -179,14 +179,23 @@ const today = () =>
 
 export function Shell() {
   const [error, setError] = useState<string | null>(null)
-  const { pathname } = useLocation()
+  const { pathname, hash, key } = useLocation()
   const { publicKey } = useWallet()
+  // `key` tylko przy kotwicy: drugi klik w ten sam link /#nagranie też ma przewinąć.
+  const anchorKey = hash ? key : null
 
-  // Nowa strona: przewiń na górę i schowaj stary błąd.
+  // Nowa strona: schowaj stary błąd i przewiń na górę albo do kotwicy z adresu (np. /#nagranie).
   useEffect(() => {
-    window.scrollTo(0, 0)
     setError(null)
-  }, [pathname])
+    const target = hash ? document.getElementById(decodeURIComponent(hash.slice(1))) : null
+    if (!target) {
+      window.scrollTo(0, 0)
+      return
+    }
+    // Po pierwszym renderze układ jeszcze się zmienia (fonty, ramka wideo): przewijamy chwilę później.
+    const timer = setTimeout(() => target.scrollIntoView(), 50)
+    return () => clearTimeout(timer)
+  }, [pathname, hash, anchorKey])
 
   return (
     <TxProvider onError={setError}>
