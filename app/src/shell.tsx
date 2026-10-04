@@ -143,9 +143,33 @@ function ThemeSwitch() {
     setTheme(t)
   }
   return (
-    <div className="theme-switch" role="group" aria-label="Motyw">
+    <div className="seg-switch" role="group" aria-label="Motyw">
       <button aria-pressed={theme === 'light'} onClick={() => choose('light')}>jasny</button>
       <button aria-pressed={theme === 'dark'} onClick={() => choose('dark')}>ciemny</button>
+    </div>
+  )
+}
+
+type Look = 'gazeta' | 'classic'
+const LOOK_KEY = 'zwrotka:style'
+
+/** Wygląd: „Gazeta” (domyślny) albo „Klasyczny” (poprzedni styl). Działa z oboma motywami. */
+function LookSwitch() {
+  const [look, setLook] = useState<Look>(() => (document.documentElement.dataset.style === 'classic' ? 'classic' : 'gazeta'))
+  const choose = (l: Look) => {
+    if (l === 'classic') document.documentElement.dataset.style = 'classic'
+    else delete document.documentElement.dataset.style
+    try {
+      localStorage.setItem(LOOK_KEY, l)
+    } catch {
+      /* bez localStorage wybór działa do odświeżenia strony */
+    }
+    setLook(l)
+  }
+  return (
+    <div className="seg-switch" role="group" aria-label="Wygląd">
+      <button aria-pressed={look === 'gazeta'} onClick={() => choose('gazeta')}>gazeta</button>
+      <button aria-pressed={look === 'classic'} onClick={() => choose('classic')}>klasyczny</button>
     </div>
   )
 }
@@ -182,7 +206,10 @@ export function Shell() {
         </nav>
         <div className="wallet">
           <Balance />
-          <ThemeSwitch />
+          <div className="prefs">
+            <LookSwitch />
+            <ThemeSwitch />
+          </div>
           <WalletMultiButton />
         </div>
       </header>

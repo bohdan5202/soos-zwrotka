@@ -5,6 +5,7 @@ import { ConnectionProvider, WalletProvider } from '@solana/wallet-adapter-react
 import { WalletModalProvider } from '@solana/wallet-adapter-react-ui'
 import '@solana/wallet-adapter-react-ui/styles.css'
 import './index.css'
+import './classic.css'
 import App from './App.tsx'
 
 // Publiczny RPC devnetu ma niskie limity. Na demo warto ustawić własny w app/.env.local:

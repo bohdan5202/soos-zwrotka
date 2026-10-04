@@ -113,7 +113,8 @@ h3 { margin: 22px 0 10px; font-size: 1.1rem; }
 }
 .brand { display: flex; align-items: center; gap: 10px; text-decoration: none; color: var(--text); font-family: var(--serif); font-weight: 500; font-size: 1.6rem; letter-spacing: -0.02em; }
 .net { font-family: var(--sans); font-size: 0.72rem; font-weight: 500; letter-spacing: 0.04em; font-variant-caps: all-small-caps; color: var(--muted); border: 1px solid var(--border); padding: 0 6px; border-radius: 2px; }
-.wallet { display: flex; align-items: center; gap: 12px; }
+.wallet { display: flex; align-items: center; gap: 8px 12px; flex-wrap: wrap; justify-content: flex-end; }
+.wallet > * { flex-shrink: 0; }
 .wallet-adapter-button {
   background: var(--text) !important; color: var(--bg) !important; border-radius: 2px !important;
   height: 36px !important; padding: 0 14px !important; font-family: var(--sans) !important; font-size: 0.85rem !important; font-weight: 500 !important;
@@ -121,6 +122,8 @@ h3 { margin: 22px 0 10px; font-size: 1.1rem; }
 .wallet-adapter-button:not([disabled]):hover { background: var(--brand) !important; color: var(--on-brand) !important; }
 .wallet-adapter-button-start-icon { display: none; }
 .balance { font-family: var(--mono); }
+.logo-shield { display: none; }
+.prefs { display: flex; gap: 8px; align-items: center; }
 
 .edition {
   display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap;
@@ -131,10 +134,10 @@ h3 { margin: 22px 0 10px; font-size: 1.1rem; }
 .edition-wrap { border-bottom: 1px solid var(--border); }
 .edition-wrap .edition { border-bottom: 0; }
 
-.theme-switch { display: inline-flex; border: 1px solid var(--rule); border-radius: 2px; overflow: hidden; }
-.theme-switch button { background: transparent; color: var(--muted); border-radius: 0; padding: 4px 9px; font-size: 0.78rem; font-weight: 500; }
-.theme-switch button[aria-pressed='true'] { background: var(--text); color: var(--bg); }
-.theme-switch button:hover:not([aria-pressed='true']) { color: var(--text); filter: none; }
+.seg-switch { display: inline-flex; border: 1px solid var(--rule); border-radius: 2px; overflow: hidden; }
+.seg-switch button { background: transparent; color: var(--muted); border-radius: 0; padding: 4px 9px; font-size: 0.78rem; font-weight: 500; }
+.seg-switch button[aria-pressed='true'] { background: var(--text); color: var(--bg); }
+.seg-switch button:hover:not([aria-pressed='true']) { color: var(--text); filter: none; }
 
 .page { max-width: 1000px; margin: 0 auto; padding: 24px 16px 56px; }
 .footer { text-align: center; padding: 18px 16px 40px; border-top: 2px solid var(--rule); max-width: 1000px; margin: 0 auto; }

@@ -10,13 +10,14 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
       rel="stylesheet"
-      href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,400&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,400&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Inter:wght@400;500;600;700;800&display=swap"
     />
     <script>
-      // Motyw wybrany przez użytkownika ustawiamy przed renderem, żeby strona nie mrugała.
+      // Motyw i wygląd wybrane przez użytkownika ustawiamy przed renderem, żeby strona nie mrugała.
       try {
         var t = localStorage.getItem('zwrotka:theme')
         if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t
+        if (localStorage.getItem('zwrotka:style') === 'classic') document.documentElement.dataset.style = 'classic'
       } catch (e) {}
     </script>
   </head>
