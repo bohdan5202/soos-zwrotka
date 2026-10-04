@@ -3,7 +3,7 @@
 import { Connection, PublicKey, type VersionedTransactionResponse } from "@solana/web3.js";
 import { PROGRAM_ID } from "./program";
 
-export type EventKind = "create" | "buy" | "price" | "refund" | "release";
+export type EventKind = "create" | "buy" | "price" | "refund" | "release" | "sellerRefund" | "closeSales";
 
 export type ActivityEvent = {
   sig: string;
@@ -18,6 +18,7 @@ export type ActivityEvent = {
   toSeller?: bigint;
   locked?: bigint;
   toBuyer?: bigint;
+  fromSeller?: bigint; // dopłata sprzedawcy przy zwrocie zakupu
   until?: number;
   failed?: boolean;
 };
@@ -28,6 +29,8 @@ export type Totals = {
   floorToSeller: bigint;
   refundedToBuyers: bigint; // claim + część release dla kupujących
   releasedToSeller: bigint;
+  sellerTopUps: bigint; // ile sprzedawca dopłacił przy zwrotach zakupów
+  sellerRefunds: number;
   priceChanges: number;
   buyers: Set<string>;
 };
@@ -38,6 +41,8 @@ const RE = {
   price: /Price changed to (\d+)/,
   refund: /Refunded (\d+) to buyer/,
   release: /Released: (\d+) to buyer, (\d+) to seller/,
+  sellerRefund: /Refund by seller: (\d+) to buyer \((\d+) from reserve, (\d+) from seller\), (\d+) back to seller/,
+  closeSales: /Sales closed/,
 };
 
 const PROGRAM = PROGRAM_ID.toBase58();
@@ -50,7 +55,8 @@ function parseTx(sig: string, slot: number, tx: VersionedTransactionResponse | n
   if (!ix) return [];
   // Kolejność kont jak w programie:
   // create [seller, offer], buy [buyer, seller, offer, purchase], set_price [seller, offer],
-  // claim [offer, purchase, buyer], release [offer, purchase, buyer, seller]
+  // claim [offer, purchase, buyer], release [offer, purchase, buyer, seller],
+  // refund_purchase [seller, offer, purchase, buyer, ...], close_sales [seller, offer]
   const a = ix.accountKeyIndexes.map((k) => keys[k]);
   const base = { sig, slot, ts: tx.blockTime ?? 0, actor: keys[0], failed: !!tx.meta?.err };
   const evs: ActivityEvent[] = [];
@@ -66,6 +72,9 @@ function parseTx(sig: string, slot: number, tx: VersionedTransactionResponse | n
       evs.push({ ...base, kind: "refund", offer: a[0], buyer: a[2], amount: BigInt(m[1]) });
     else if ((m = l.match(RE.release)))
       evs.push({ ...base, kind: "release", offer: a[0], buyer: a[2], seller: a[3], toBuyer: BigInt(m[1]), toSeller: BigInt(m[2]) });
+    else if ((m = l.match(RE.sellerRefund)))
+      evs.push({ ...base, kind: "sellerRefund", offer: a[1], seller: a[0], buyer: a[3], amount: BigInt(m[1]), fromSeller: BigInt(m[3]), toSeller: BigInt(m[4]) });
+    else if (RE.closeSales.test(l)) evs.push({ ...base, kind: "closeSales", offer: a[1], seller: a[0] });
   }
   return evs;
 }
@@ -135,7 +144,8 @@ export function rolesIn(e: ActivityEvent, wallet: string): Role[] {
 
 export function totals(events: ActivityEvent[]): Totals {
   const t: Totals = {
-    sales: 0, revenue: 0n, floorToSeller: 0n, refundedToBuyers: 0n, releasedToSeller: 0n, priceChanges: 0, buyers: new Set(),
+    sales: 0, revenue: 0n, floorToSeller: 0n, refundedToBuyers: 0n, releasedToSeller: 0n,
+    sellerTopUps: 0n, sellerRefunds: 0, priceChanges: 0, buyers: new Set(),
   };
   for (const e of events) {
     if (e.failed) continue;
@@ -149,6 +159,11 @@ export function totals(events: ActivityEvent[]): Totals {
     else if (e.kind === "release") {
       t.refundedToBuyers += e.toBuyer ?? 0n;
       t.releasedToSeller += e.toSeller ?? 0n;
+    } else if (e.kind === "sellerRefund") {
+      t.sellerRefunds++;
+      t.refundedToBuyers += e.amount ?? 0n;
+      t.releasedToSeller += e.toSeller ?? 0n;
+      t.sellerTopUps += e.fromSeller ?? 0n;
     }
   }
   return t;

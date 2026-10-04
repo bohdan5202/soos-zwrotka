@@ -25,6 +25,23 @@ pub struct Offer {
     #[max_len(32)]
     pub history: Vec<PricePoint>,
     pub bump: u8,
+    /// Sprzedaż zakończona (`close_sales`): nowych zakupów nie ma.
+    /// Pole na końcu: starsze konta mają tu zero z niewykorzystanego miejsca historii, czyli `false`.
+    pub closed: bool,
+}
+
+/// Prośba kupującego o zwrot (np. odwołane zajęcia). Osobne konto, żeby nie zmieniać
+/// układu `Purchase`. Decyzję podejmuje sprzedawca przez `refund_purchase`.
+#[account]
+#[derive(InitSpace)]
+pub struct RefundRequest {
+    pub purchase: Pubkey,
+    pub offer: Pubkey,
+    pub buyer: Pubkey,
+    pub requested_at: i64,
+    #[max_len(80)]
+    pub reason: String,
+    pub bump: u8,
 }
 
 /// Zakup jednego kupującego. Konto jest jednocześnie sejfem rezerwy:

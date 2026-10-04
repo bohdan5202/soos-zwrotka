@@ -42,6 +42,7 @@ pub fn handle_create_offer(
     offer.event_start = event_start.max(0);
     offer.history = Vec::new();
     offer.bump = ctx.bumps.offer;
+    offer.closed = false;
 
     msg!("Offer {} created: price {}, floor {}", offer_id, price, floor);
     Ok(())

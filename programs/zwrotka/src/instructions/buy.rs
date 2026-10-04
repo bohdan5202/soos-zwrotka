@@ -28,6 +28,7 @@ pub struct Buy<'info> {
 
 pub fn handle_buy(ctx: Context<Buy>) -> Result<()> {
     let offer = &ctx.accounts.offer;
+    require!(!offer.closed, ErrorCode::SalesClosed);
     let now = Clock::get()?.unix_timestamp;
 
     // Sprzedawca od razu dostaje floor (albo całą cenę, jeśli spadła poniżej floor).

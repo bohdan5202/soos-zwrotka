@@ -5,7 +5,18 @@ import { PublicKey } from '@solana/web3.js'
 import { fetchActivity, type ActivityEvent } from '../activity'
 import { DEFAULT_NAME, loadNames } from '../names'
 import { BUYER_TABS, OfferView, SELLER_TABS } from '../OfferView'
-import { fetchCreatedAt, fetchOffer, fetchOfferTitle, fetchPurchase, fetchPurchases, purchasePda, type Offer, type Purchase } from '../program'
+import {
+  fetchCreatedAt,
+  fetchOffer,
+  fetchOfferTitle,
+  fetchPurchase,
+  fetchPurchases,
+  fetchRefundRequests,
+  purchasePda,
+  type Offer,
+  type Purchase,
+  type RefundRequest,
+} from '../program'
 import { useRefreshOnTx, useTx } from '../shell'
 
 export function OfferPage() {
@@ -35,6 +46,7 @@ export function OfferPage() {
   const [loaded, setLoaded] = useState(false)
   const [purchases, setPurchases] = useState<Purchase[]>([])
   const [mine, setMine] = useState<Purchase | null>(null)
+  const [requests, setRequests] = useState<Map<string, RefundRequest>>(new Map())
   const [events, setEvents] = useState<ActivityEvent[] | null>(null)
   const [createdAt, setCreatedAt] = useState<number | null>(null)
 
@@ -46,6 +58,7 @@ export function OfferPage() {
     if (!o) return
     setPurchases(await fetchPurchases(connection, offerAddr))
     setMine(publicKey ? await fetchPurchase(connection, purchasePda(offerAddr, publicKey)) : null)
+    setRequests(await fetchRefundRequests(connection, offerAddr))
   }, [connection, offerAddr, publicKey])
 
   const refreshActivity = useCallback(async () => {
@@ -98,6 +111,7 @@ export function OfferPage() {
       name={name}
       purchases={purchases}
       mine={mine}
+      requests={requests}
       events={events}
       createdAt={createdAt}
       now={now}

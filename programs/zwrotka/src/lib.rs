@@ -48,4 +48,16 @@ pub mod zwrotka {
     pub fn release(ctx: Context<Release>) -> Result<()> {
         crate::instructions::release::handle_release(ctx)
     }
+
+    pub fn close_sales(ctx: Context<CloseSales>) -> Result<()> {
+        crate::instructions::close_sales::handle_close_sales(ctx)
+    }
+
+    pub fn request_refund(ctx: Context<RequestRefund>, reason: String) -> Result<()> {
+        crate::instructions::request_refund::handle_request_refund(ctx, reason)
+    }
+
+    pub fn refund_purchase(ctx: Context<RefundPurchase>, amount: u64) -> Result<()> {
+        crate::instructions::refund_purchase::handle_refund_purchase(ctx, amount)
+    }
 }

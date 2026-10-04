@@ -16,4 +16,12 @@ pub enum ErrorCode {
     WindowNotEnded,
     #[msg("Arithmetic overflow")]
     Overflow,
+    #[msg("Sales for this offer are closed")]
+    SalesClosed,
+    #[msg("Refund cannot be lower than what the buyer is already owed")]
+    RefundBelowDue,
+    #[msg("Refund cannot exceed what the buyer paid minus what was already returned")]
+    RefundAbovePaid,
+    #[msg("Reason is too long")]
+    ReasonTooLong,
 }

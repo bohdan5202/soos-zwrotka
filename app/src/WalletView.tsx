@@ -123,7 +123,7 @@ export function WalletView({
   const buyerDue = (buying ?? []).reduce((s, b) => s + (b.offer ? due(b.purchase, b.offer) : 0n), 0n)
   const buyerProtected = (buying ?? []).reduce((s, b) => s + b.purchase.reserve - b.purchase.claimed, 0n)
   const buyerRefunded =
-    histBuyer.reduce((s, e) => s + (e.failed ? 0n : e.kind === 'refund' ? e.amount ?? 0n : e.kind === 'release' ? e.toBuyer ?? 0n : 0n), 0n)
+    histBuyer.reduce((s, e) => s + (e.failed ? 0n : e.kind === 'refund' || e.kind === 'sellerRefund' ? e.amount ?? 0n : e.kind === 'release' ? e.toBuyer ?? 0n : 0n), 0n)
   const buyerSpent = histBuyer.reduce((s, e) => s + (!e.failed && e.kind === 'buy' ? e.amount ?? 0n : 0n), 0n)
   const claimable = (buying ?? []).filter((b) => b.offer && due(b.purchase, b.offer) > 0n)
 
@@ -309,7 +309,9 @@ export function WalletView({
   )
 }
 
-const ICON: Record<ActivityEvent['kind'], string> = { create: '✨', buy: '🛒', price: '🏷️', refund: '💸', release: '🔓' }
+const ICON: Record<ActivityEvent['kind'], string> = {
+  create: '✨', buy: '🛒', price: '🏷️', refund: '💸', release: '🔓', sellerRefund: '↩️', closeSales: '⛔',
+}
 
 function describe(e: ActivityEvent) {
   switch (e.kind) {
@@ -318,6 +320,8 @@ function describe(e: ActivityEvent) {
     case 'price': return <>Zmiana ceny na {fmtZl(e.amount ?? 0n)}</>
     case 'refund': return <>Zwrot {fmtZl(e.amount ?? 0n)} dla {short(e.buyer ?? '?')}</>
     case 'release': return <>Rozliczenie: {fmtZl(e.toBuyer ?? 0n)} kupującemu, {fmtZl(e.toSeller ?? 0n)} sprzedawcy</>
+    case 'sellerRefund': return <>Anulowanie zakupu: zwrot {fmtZl(e.amount ?? 0n)} (dopłata sprzedawcy {fmtZl(e.fromSeller ?? 0n)})</>
+    case 'closeSales': return <>Zakończenie sprzedaży</>
   }
 }
 

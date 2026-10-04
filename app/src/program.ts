@@ -27,8 +27,12 @@ const DISC = {
   setPrice: [16, 19, 182, 8, 149, 83, 72, 181],
   claimDifference: [166, 248, 204, 254, 109, 173, 25, 72],
   release: [253, 249, 15, 206, 28, 127, 193, 241],
+  closeSales: [63, 216, 175, 193, 204, 39, 113, 225],
+  requestRefund: [155, 77, 126, 53, 47, 81, 144, 82],
+  refundPurchase: [217, 136, 120, 57, 32, 87, 47, 173],
   offer: [215, 88, 60, 71, 170, 162, 73, 229],
   purchase: [33, 203, 1, 252, 231, 228, 8, 67],
+  refundRequest: [40, 79, 128, 211, 184, 96, 201, 204],
 };
 
 const enc = new TextEncoder();
@@ -74,6 +78,17 @@ export type Offer = {
   windowSecs: bigint;
   eventStart: bigint;
   history: PricePoint[];
+  /** Sprzedaż zakończona (close_sales). */
+  closed: boolean;
+};
+
+export type RefundRequest = {
+  address: PublicKey;
+  purchase: PublicKey;
+  offer: PublicKey;
+  buyer: PublicKey;
+  requestedAt: bigint;
+  reason: string;
 };
 
 export type Purchase = {
@@ -116,6 +131,15 @@ class Reader {
     this.o += 4;
     return n;
   }
+  u8() {
+    return this.o < this.d.length ? this.d[this.o++] : 0;
+  }
+  string() {
+    const len = this.u32();
+    const s = new TextDecoder().decode(this.d.slice(this.o, this.o + len));
+    this.o += len;
+    return s;
+  }
 }
 
 function hasDisc(data: Uint8Array, disc: number[]) {
@@ -134,7 +158,41 @@ export function decodeOffer(address: PublicKey, data: Uint8Array): Offer {
   const len = r.u32();
   const history: PricePoint[] = [];
   for (let i = 0; i < len; i++) history.push({ ts: r.i64(), price: r.u64() });
-  return { address, seller, offerId, price, floor, windowSecs, eventStart, history };
+  r.u8(); // bump
+  const closed = r.u8() === 1; // starsze konta: zero z niewykorzystanego miejsca → false
+  return { address, seller, offerId, price, floor, windowSecs, eventStart, history, closed };
+}
+
+export function decodeRefundRequest(address: PublicKey, data: Uint8Array): RefundRequest {
+  const r = new Reader(data);
+  return {
+    address,
+    purchase: r.pubkey(),
+    offer: r.pubkey(),
+    buyer: r.pubkey(),
+    requestedAt: r.i64(),
+    reason: r.string(),
+  };
+}
+
+export function requestPda(purchase: PublicKey) {
+  return PublicKey.findProgramAddressSync([enc.encode("refund_request"), purchase.toBytes()], PROGRAM_ID)[0];
+}
+
+/** Prośby o zwrot w ofercie (offer leży po dyskryminatorze i polu purchase: offset 40). */
+export async function fetchRefundRequests(c: Connection, offer: PublicKey) {
+  const accs = await c.getProgramAccounts(PROGRAM_ID, {
+    filters: [
+      { memcmp: { offset: 0, bytes: bs58Disc(DISC.refundRequest) } },
+      { memcmp: { offset: 40, bytes: offer.toBase58() } },
+    ],
+  });
+  const by = new Map<string, RefundRequest>();
+  for (const a of accs) {
+    const q = decodeRefundRequest(a.pubkey, a.account.data);
+    by.set(q.purchase.toBase58(), q);
+  }
+  return by;
 }
 
 export function decodePurchase(address: PublicKey, data: Uint8Array): Purchase {
@@ -367,6 +425,65 @@ export function releaseIx(offer: Offer, purchase: Purchase) {
     ],
     data: concat(DISC.release),
   });
+}
+
+// ---------- Anulowanie ----------
+
+/** Sprzedawca kończy sprzedaż (nowych zakupów nie będzie). */
+export function closeSalesIx(seller: PublicKey, offer: PublicKey) {
+  return new TransactionInstruction({
+    programId: PROGRAM_ID,
+    keys: [
+      { pubkey: seller, isSigner: true, isWritable: false },
+      { pubkey: offer, isSigner: false, isWritable: true },
+    ],
+    data: concat(DISC.closeSales),
+  });
+}
+
+/** Kupujący prosi o zwrot; decyzja należy do sprzedawcy. */
+export function requestRefundIx(buyer: PublicKey, purchase: PublicKey, reason: string) {
+  const text = enc.encode(reason);
+  const len = new Uint8Array(4);
+  new DataView(len.buffer).setUint32(0, text.length, true);
+  return new TransactionInstruction({
+    programId: PROGRAM_ID,
+    keys: [
+      { pubkey: buyer, isSigner: true, isWritable: true },
+      { pubkey: purchase, isSigner: false, isWritable: false },
+      { pubkey: requestPda(purchase), isSigner: false, isWritable: true },
+      { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+    ],
+    data: concat(DISC.requestRefund, len, text),
+  });
+}
+
+/**
+ * Sprzedawca oddaje kupującemu `amount`: najpierw z rezerwy, resztę dopłaca sam.
+ * Zakup (i ewentualna prośba o zwrot) się zamyka. Brak prośby = PROGRAM_ID w miejscu
+ * opcjonalnego konta (konwencja Anchora).
+ */
+export function refundPurchaseIx(seller: PublicKey, offer: PublicKey, p: Purchase, amount: bigint, hasRequest: boolean) {
+  return new TransactionInstruction({
+    programId: PROGRAM_ID,
+    keys: [
+      { pubkey: seller, isSigner: true, isWritable: true },
+      { pubkey: offer, isSigner: false, isWritable: false },
+      { pubkey: p.address, isSigner: false, isWritable: true },
+      { pubkey: p.buyer, isSigner: false, isWritable: true },
+      hasRequest
+        ? { pubkey: requestPda(p.address), isSigner: false, isWritable: true }
+        : { pubkey: PROGRAM_ID, isSigner: false, isWritable: false },
+      { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+    ],
+    data: concat(DISC.refundPurchase, u64(amount)),
+  });
+}
+
+/** Ile sprzedawca dopłaci ze swojego portfela przy zwrocie `amount`. */
+export function sellerTopUp(p: Purchase, amount: bigint) {
+  const left = p.reserve - p.claimed;
+  return amount > left ? amount - left : 0n;
 }
 
 // ---------- Nazwa oferty on-chain (SPL Memo w transakcji utworzenia) ----------

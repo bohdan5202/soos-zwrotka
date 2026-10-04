@@ -349,3 +349,185 @@ fn release_with_wrong_seller_fails() {
     );
     assert!(env.send(ix, &ania).is_err());
 }
+
+// ---------- Anulowanie: zwrot jednego zakupu, zamknięcie sprzedaży, prośba o zwrot ----------
+
+fn request_pda(purchase: &Pubkey) -> Pubkey {
+    Pubkey::find_program_address(
+        &[zwrotka::constants::REFUND_REQUEST_SEED, purchase.as_ref()],
+        &zwrotka::id(),
+    )
+    .0
+}
+
+impl Env {
+    fn close_sales(&mut self, signer: &Keypair) -> Result<(), String> {
+        let ix = Instruction::new_with_bytes(
+            zwrotka::id(),
+            &zwrotka::instruction::CloseSales {}.data(),
+            zwrotka::accounts::CloseSales {
+                seller: signer.pubkey(),
+                offer: self.offer,
+            }
+            .to_account_metas(None),
+        );
+        self.send(ix, signer)
+    }
+
+    fn request_refund(&mut self, buyer: &Keypair, reason: &str) -> Result<(), String> {
+        let purchase = purchase_pda(&self.offer, &buyer.pubkey());
+        let ix = Instruction::new_with_bytes(
+            zwrotka::id(),
+            &zwrotka::instruction::RequestRefund { reason: reason.to_string() }.data(),
+            zwrotka::accounts::RequestRefund {
+                buyer: buyer.pubkey(),
+                purchase,
+                refund_request: request_pda(&purchase),
+                system_program: system_program::ID,
+            }
+            .to_account_metas(None),
+        );
+        self.send(ix, buyer)
+    }
+
+    fn refund_ix(&self, seller: &Pubkey, buyer: &Pubkey, amount: u64, with_request: bool) -> Instruction {
+        let purchase = purchase_pda(&self.offer, buyer);
+        Instruction::new_with_bytes(
+            zwrotka::id(),
+            &zwrotka::instruction::RefundPurchase { amount }.data(),
+            zwrotka::accounts::RefundPurchase {
+                seller: *seller,
+                offer: self.offer,
+                purchase,
+                buyer: *buyer,
+                refund_request: with_request.then(|| request_pda(&purchase)),
+                system_program: system_program::ID,
+            }
+            .to_account_metas(None),
+        )
+    }
+
+    fn refund(&mut self, signer: &Keypair, buyer: &Pubkey, amount: u64) -> Result<(), String> {
+        let ix = self.refund_ix(&signer.pubkey(), buyer, amount, false);
+        self.send(ix, signer)
+    }
+}
+
+#[test]
+fn full_refund_returns_everything_and_closes_purchase() {
+    let mut env = Env::new(30 * DAY, 0);
+    let (ania, seller) = (env.ania.insecure_clone(), env.seller.insecure_clone());
+    env.buy(&ania).unwrap();
+    let purchase = purchase_pda(&env.offer, &ania.pubkey());
+    let rent = env.balance(&purchase) - (PRICE - FLOOR);
+    let ania_before = env.balance(&ania.pubkey());
+    let seller_before = env.balance(&seller.pubkey());
+
+    env.refund(&seller, &ania.pubkey(), PRICE).unwrap();
+
+    // Ania: cała cena + rent konta zakupu. Sprzedawca dopłaca floor (+ opłata za transakcję).
+    assert_eq!(env.balance(&ania.pubkey()) - ania_before, PRICE + rent);
+    assert_eq!(seller_before - env.balance(&seller.pubkey()), FLOOR + 5000);
+    assert!(env.svm.get_account(&purchase).map_or(true, |a| a.lamports == 0));
+}
+
+#[test]
+fn partial_refund_uses_reserve_first_and_returns_rest_to_seller() {
+    let mut env = Env::new(30 * DAY, 0);
+    let (ania, seller) = (env.ania.insecure_clone(), env.seller.insecure_clone());
+    env.buy(&ania).unwrap();
+    let ania_before = env.balance(&ania.pubkey());
+    let seller_before = env.balance(&seller.pubkey());
+
+    // Zwrot 100 zł z rezerwy 200: sprzedawca nic nie dopłaca, 100 zł rezerwy wraca do niego.
+    env.refund(&seller, &ania.pubkey(), SOL / 10).unwrap();
+
+    let purchase = purchase_pda(&env.offer, &ania.pubkey());
+    assert!(env.svm.get_account(&purchase).map_or(true, |a| a.lamports == 0));
+    assert!(env.balance(&ania.pubkey()) - ania_before >= SOL / 10);
+    assert_eq!(env.balance(&seller.pubkey()) + 5000 - seller_before, SOL / 10);
+}
+
+#[test]
+fn refund_cannot_be_below_what_price_rule_owes() {
+    let mut env = Env::new(30 * DAY, 0);
+    let (ania, seller) = (env.ania.insecure_clone(), env.seller.insecure_clone());
+    env.buy(&ania).unwrap();
+    env.set_price(&seller, SOL * 85 / 100).unwrap(); // należy się 150
+    assert!(env.refund(&seller, &ania.pubkey(), SOL / 10).is_err()); // 100 < 150
+    assert!(env.refund(&seller, &ania.pubkey(), PRICE + 1).is_err()); // więcej niż zapłaciła
+    env.refund(&seller, &ania.pubkey(), SOL * 15 / 100).unwrap();
+}
+
+#[test]
+fn only_seller_can_refund_or_close_sales() {
+    let mut env = Env::new(30 * DAY, 0);
+    let (ania, bartek) = (env.ania.insecure_clone(), env.bartek.insecure_clone());
+    env.buy(&ania).unwrap();
+    assert!(env.refund(&bartek, &ania.pubkey(), PRICE).is_err());
+    assert!(env.close_sales(&bartek).is_err());
+}
+
+#[test]
+fn closed_sales_block_new_purchases() {
+    let mut env = Env::new(30 * DAY, 0);
+    let (ania, bartek, seller) = (
+        env.ania.insecure_clone(),
+        env.bartek.insecure_clone(),
+        env.seller.insecure_clone(),
+    );
+    env.buy(&ania).unwrap();
+    env.close_sales(&seller).unwrap();
+    assert!(env.offer_state().closed);
+    assert!(env.buy(&bartek).is_err());
+    // Istniejący zakup działa dalej: obniżka i zwrot różnicy.
+    env.set_price(&seller, SOL * 9 / 10).unwrap();
+    env.claim(&ania.pubkey(), &ania).unwrap();
+}
+
+#[test]
+fn request_refund_then_seller_refunds_and_request_is_closed() {
+    let mut env = Env::new(30 * DAY, 0);
+    let (ania, seller) = (env.ania.insecure_clone(), env.seller.insecure_clone());
+    env.buy(&ania).unwrap();
+    env.request_refund(&ania, "Zajęcia odwołane").unwrap();
+    let purchase = purchase_pda(&env.offer, &ania.pubkey());
+    let req = request_pda(&purchase);
+    assert!(env.svm.get_account(&req).is_some());
+
+    let ix = env.refund_ix(&seller.pubkey(), &ania.pubkey(), PRICE, true);
+    env.send(ix, &seller).unwrap();
+    assert!(env.svm.get_account(&req).map_or(true, |a| a.lamports == 0));
+    assert!(env.request_refund(&ania, &"x".repeat(81)).is_err()); // zakup już zamknięty
+}
+
+#[test]
+fn cancel_whole_offer_in_one_transaction() {
+    let mut env = Env::new(30 * DAY, 0);
+    let (ania, bartek, seller) = (
+        env.ania.insecure_clone(),
+        env.bartek.insecure_clone(),
+        env.seller.insecure_clone(),
+    );
+    env.buy(&ania).unwrap();
+    env.buy(&bartek).unwrap();
+
+    let close = Instruction::new_with_bytes(
+        zwrotka::id(),
+        &zwrotka::instruction::CloseSales {}.data(),
+        zwrotka::accounts::CloseSales { seller: seller.pubkey(), offer: env.offer }.to_account_metas(None),
+    );
+    let r1 = env.refund_ix(&seller.pubkey(), &ania.pubkey(), PRICE, false);
+    let r2 = env.refund_ix(&seller.pubkey(), &bartek.pubkey(), PRICE, false);
+    env.svm.expire_blockhash();
+    let bh = env.svm.latest_blockhash();
+    let msg = Message::new_with_blockhash(&[close, r1, r2], Some(&seller.pubkey()), &bh);
+    let tx = VersionedTransaction::try_new(VersionedMessage::Legacy(msg), &[&seller]).unwrap();
+    env.svm.send_transaction(tx).map_err(|e| format!("{:?}", e.meta.logs)).unwrap();
+
+    assert!(env.offer_state().closed);
+    for b in [&ania, &bartek] {
+        let p = purchase_pda(&env.offer, &b.pubkey());
+        assert!(env.svm.get_account(&p).map_or(true, |a| a.lamports == 0));
+    }
+}

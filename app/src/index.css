@@ -357,3 +357,17 @@ a.small-btn { padding: 7px 12px; font-size: 0.82rem; }
 .pc-facts { list-style: none; padding: 0; margin: 6px 0 4px; display: grid; gap: 4px; font-size: 0.86rem; color: var(--text-2); }
 .pc-cta { margin-top: auto; padding-top: 8px; color: var(--brand-strong); font-weight: 600; font-size: 0.9rem; }
 .ok-text { color: var(--ok); }
+
+/* ---------- anulowanie ---------- */
+.notice { background: var(--surface); border: 1px solid var(--border); border-left: 4px solid var(--muted); border-radius: 12px; padding: 12px 16px; margin-bottom: 16px; }
+.warn-notice { border-left-color: var(--warn); background: var(--warn-soft); }
+.notice-card { border-left: 4px solid var(--warn); }
+.warn-btn { background: var(--warn); color: #fff; }
+.danger-zone { border-color: color-mix(in srgb, var(--warn) 40%, var(--border)); }
+.danger-row { display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; padding: 12px 0; border-top: 1px solid var(--border); }
+.danger-row p { margin: 4px 0 0; max-width: 560px; }
+tr.has-request td { background: var(--warn-soft); }
+.req-badge { font-size: 0.75rem; color: var(--warn); font-weight: 600; white-space: normal; max-width: 220px; }
+.refund-row td { background: var(--bg); white-space: normal; }
+.refund-form { display: flex; flex-direction: column; gap: 8px; padding: 6px 0; }
+.refund-form p { margin: 0; }

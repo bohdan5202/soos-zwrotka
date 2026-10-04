@@ -127,6 +127,7 @@ export function Catalog() {
             <Link key={addr} to={`/oferta/${addr}`} className="product-card">
               <div className="pc-top">
                 {pct > 0 ? <span className="pill ok">🛡️ ochrona do {pct}%</span> : <span className="pill">bez ochrony</span>}
+                {o.closed && <span className="pill">sprzedaż zakończona</span>}
                 {mine && <span className="role seller-role mini">Twoja</span>}
               </div>
               <h3>{nameOf(o)}</h3>
