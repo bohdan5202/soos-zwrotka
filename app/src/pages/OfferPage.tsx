@@ -5,7 +5,7 @@ import { PublicKey } from '@solana/web3.js'
 import { fetchActivity, type ActivityEvent } from '../activity'
 import { DEFAULT_NAME, loadNames } from '../names'
 import { BUYER_TABS, OfferView, SELLER_TABS } from '../OfferView'
-import { fetchCreatedAt, fetchOffer, fetchPurchase, fetchPurchases, purchasePda, type Offer, type Purchase } from '../program'
+import { fetchCreatedAt, fetchOffer, fetchOfferTitle, fetchPurchase, fetchPurchases, purchasePda, type Offer, type Purchase } from '../program'
 import { useRefreshOnTx, useTx } from '../shell'
 
 export function OfferPage() {
@@ -23,7 +23,13 @@ export function OfferPage() {
       return null
     }
   }, [address])
-  const name = search.get('name') ?? loadNames()[address] ?? DEFAULT_NAME
+  // Kolejność: link (?name=) → nazwa zapisana u sprzedawcy → Memo on-chain → domyślna.
+  const [chainTitle, setChainTitle] = useState<string | null>(null)
+  useEffect(() => {
+    setChainTitle(null)
+    if (offerAddr) fetchOfferTitle(connection, offerAddr).then(setChainTitle).catch(() => {})
+  }, [connection, offerAddr])
+  const name = search.get('name') ?? loadNames()[address] ?? chainTitle ?? DEFAULT_NAME
 
   const [offer, setOffer] = useState<Offer | null>(null)
   const [loaded, setLoaded] = useState(false)

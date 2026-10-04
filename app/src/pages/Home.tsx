@@ -16,7 +16,7 @@ export function Home() {
             ani odmówić.
           </p>
           <div className="cta-row">
-            <a className="btn big" href="#ochrona">Sprawdź, ile odzyskasz</a>
+            <Link className="btn big" to="/katalog">Zobacz oferty z ochroną</Link>
             <Link className="btn secondary big" to="/sprzedawca">Jestem sprzedawcą</Link>
           </div>
           <ul className="trust">

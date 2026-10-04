@@ -2,6 +2,7 @@ import { useMemo } from 'react'
 import { Navigate, useNavigate, useParams } from 'react-router'
 import { PublicKey } from '@solana/web3.js'
 import { loadNames } from '../names'
+import { readTitles } from '../program'
 import { useTx } from '../shell'
 import { WALLET_TAB_SLUGS, WalletView, type WalletTab } from '../WalletView'
 
@@ -25,7 +26,7 @@ export function WalletPage() {
     <WalletView
       key={address}
       wallet={wallet}
-      names={loadNames()}
+      names={{ ...(readTitles() as Record<string, string>), ...loadNames() }}
       now={now}
       busy={busy}
       send={send}

@@ -343,3 +343,17 @@ a.small-btn { padding: 7px 12px; font-size: 0.82rem; }
 .narrow { max-width: 520px; margin: 40px auto; }
 .narrow .wallet-adapter-button { margin: 8px auto 0; }
 .create { max-width: 760px; }
+
+/* ---------- katalog ---------- */
+.toolbar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin: 8px 0 18px; }
+.toolbar input:not([type='checkbox']) { flex: 1 1 260px; }
+.check { flex-direction: row; align-items: center; gap: 6px; margin: 0; }
+.catalog { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; }
+.product-card { display: flex; flex-direction: column; gap: 6px; text-decoration: none; color: var(--text); background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 18px; box-shadow: var(--shadow); transition: transform 0.12s, border-color 0.12s; }
+.product-card:hover { transform: translateY(-2px); border-color: var(--brand); }
+.product-card h3 { margin: 6px 0 0; font-size: 1.05rem; line-height: 1.3; }
+.pc-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.pc-price { font-size: 1.6rem; font-weight: 800; font-variant-numeric: tabular-nums; }
+.pc-facts { list-style: none; padding: 0; margin: 6px 0 4px; display: grid; gap: 4px; font-size: 0.86rem; color: var(--text-2); }
+.pc-cta { margin-top: auto; padding-top: 8px; color: var(--brand-strong); font-weight: 600; font-size: 0.9rem; }
+.ok-text { color: var(--ok); }

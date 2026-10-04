@@ -136,6 +136,7 @@ export function Shell() {
         </NavLink>
         <nav className="mainnav">
           <NavLink to="/" end>Jak to działa</NavLink>
+          <NavLink to="/katalog">Katalog</NavLink>
           <NavLink to="/sprzedawca">Dla sprzedawców</NavLink>
           <NavLink to="/konto">{publicKey ? 'Moje konto' : 'Konto'}</NavLink>
         </nav>

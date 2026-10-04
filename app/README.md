@@ -20,10 +20,13 @@ VITE_RPC_URL=https://devnet.helius-rpc.com/?api-key=...
 | URL | Strona |
 |---|---|
 | `/` | lejek dla kupujących: kalkulator ochrony, problem, jak działa, porównanie |
+| `/katalog` | wszystkie oferty z programu (bez backendu): wyszukiwanie, sortowanie, rezerwa każdej oferty |
 | `/sprzedawca` | dla sprzedawców: korzyści, Twoje oferty, wystawienie oferty |
 | `/oferta/:adres[/:zakładka]` | oferta; sprzedawca: `przeglad`, `analityka`, `symulator`, `kupujacy`, `historia`; kupujący: `oferta`, `przejrzystosc`, `historia` |
 | `/portfel/:adres[/kupujacy\|/sprzedawca\|/historia]` | dowolny portfel: rola, zakupy, oferty, historia |
 | `/konto` | przekierowanie na portfel połączonego konta |
+
+Nazwa oferty jest on-chain: przy tworzeniu oferty ta sama transakcja zawiera instrukcję SPL Memo `zwrotka:title:<nazwa>`. Katalog i strona oferty czytają ją z najstarszej transakcji konta oferty (`fetchOfferTitle`). Program się nie zmienia. Sprawdzenie na devnecie: `node scripts/catalog-check.ts "Nazwa"`.
 
 Stare linki `/?offer=…` i `/?wallet=…` przekierowują na nowe adresy. Hosting SPA: `vercel.json` (Vercel) i `public/_redirects` (Netlify) kierują każdy adres na `index.html`.
 

@@ -2,6 +2,7 @@ import { Route, Routes, useLocation } from 'react-router'
 import { Shell } from './shell'
 import { Home } from './pages/Home'
 import { Seller } from './pages/Seller'
+import { Catalog } from './pages/Catalog'
 import { OfferPage } from './pages/OfferPage'
 import { WalletPage } from './pages/WalletPage'
 import { Account, LegacyRedirect, NotFound } from './pages/misc'
@@ -14,6 +15,7 @@ export default function App() {
     <Routes>
       <Route element={<Shell />}>
         <Route index element={legacy ? <LegacyRedirect /> : <Home />} />
+        <Route path="katalog" element={<Catalog />} />
         <Route path="sprzedawca" element={<Seller />} />
         <Route path="oferta/:address" element={<OfferPage />} />
         <Route path="oferta/:address/:tab" element={<OfferPage />} />

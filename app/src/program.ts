@@ -369,6 +369,77 @@ export function releaseIx(offer: Offer, purchase: Purchase) {
   });
 }
 
+// ---------- Nazwa oferty on-chain (SPL Memo w transakcji utworzenia) ----------
+
+export const MEMO_PROGRAM_ID = new PublicKey("MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr");
+const TITLE_PREFIX = "zwrotka:title:";
+
+/** Instrukcja Memo z nazwą oferty; dodawana do tej samej transakcji co create_offer. */
+export function titleMemoIx(signer: PublicKey, title: string) {
+  return new TransactionInstruction({
+    programId: MEMO_PROGRAM_ID,
+    keys: [{ pubkey: signer, isSigner: true, isWritable: false }],
+    data: Buffer.from(TITLE_PREFIX + title.slice(0, 120), "utf8"),
+  });
+}
+
+/** Wszystkie oferty w programie (katalog). */
+export async function fetchAllOffers(c: Connection) {
+  const accs = await c.getProgramAccounts(PROGRAM_ID, {
+    filters: [{ memcmp: { offset: 0, bytes: bs58Disc(DISC.offer) } }],
+  });
+  return accs.map((a) => decodeOffer(a.pubkey, a.account.data));
+}
+
+/** Wszystkie aktywne zakupy w programie, pogrupowane po ofercie. */
+export async function fetchAllPurchasesByOffer(c: Connection) {
+  const accs = await c.getProgramAccounts(PROGRAM_ID, {
+    filters: [{ memcmp: { offset: 0, bytes: bs58Disc(DISC.purchase) } }],
+  });
+  const by = new Map<string, Purchase[]>();
+  for (const a of accs) {
+    const p = decodePurchase(a.pubkey, a.account.data);
+    const k = p.offer.toBase58();
+    by.set(k, [...(by.get(k) ?? []), p]);
+  }
+  return by;
+}
+
+// Nazwa w transakcji utworzenia się nie zmienia, więc trzymamy ją w localStorage na stałe.
+const TITLE_CACHE = "zwrotka:titles";
+export function readTitles(): Record<string, string | null> {
+  try {
+    return JSON.parse(localStorage.getItem(TITLE_CACHE) ?? "{}");
+  } catch {
+    return {};
+  }
+}
+
+/** Nazwa oferty z Memo w najstarszej transakcji konta; null, jeśli oferta jej nie ma. */
+export async function fetchOfferTitle(c: Connection, offer: PublicKey): Promise<string | null> {
+  const key = offer.toBase58();
+  const cached = readTitles();
+  if (key in cached) return cached[key];
+  const sigs = await c.getSignaturesForAddress(offer, { limit: 1000 });
+  const oldest = sigs[sigs.length - 1];
+  if (!oldest) return null;
+  const tx = await c.getTransaction(oldest.signature, { maxSupportedTransactionVersion: 0 });
+  if (!tx) return null; // nie zapisujemy: spróbujemy później
+  const keys = tx.transaction.message.staticAccountKeys;
+  let title: string | null = null;
+  for (const ix of tx.transaction.message.compiledInstructions) {
+    if (!keys[ix.programIdIndex].equals(MEMO_PROGRAM_ID)) continue;
+    const text = new TextDecoder().decode(ix.data);
+    if (text.startsWith(TITLE_PREFIX)) title = text.slice(TITLE_PREFIX.length);
+  }
+  try {
+    localStorage.setItem(TITLE_CACHE, JSON.stringify({ ...readTitles(), [key]: title }));
+  } catch {
+    /* bez cache: pobierzemy ponownie następnym razem */
+  }
+  return title;
+}
+
 export const explorerTx = (sig: string) =>
   `https://explorer.solana.com/tx/${sig}?cluster=devnet`;
 export const explorerAddr = (a: PublicKey) =>

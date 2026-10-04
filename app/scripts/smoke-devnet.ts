@@ -24,6 +24,7 @@ import {
   purchasePda,
   releaseIx,
   setPriceIx,
+  titleMemoIx,
   toLamports,
 } from "../src/program.ts";
 
@@ -34,8 +35,8 @@ const seller = Keypair.fromSecretKey(
 const ania = Keypair.generate();
 const bartek = Keypair.generate();
 
-const send = (ix: TransactionInstruction, ...signers: Keypair[]) =>
-  sendAndConfirmTransaction(c, new Transaction().add(ix), signers);
+const send = (ix: TransactionInstruction | TransactionInstruction[], ...signers: Keypair[]) =>
+  sendAndConfirmTransaction(c, new Transaction().add(...(Array.isArray(ix) ? ix : [ix])), signers);
 const bal = async (k: Keypair) => (await c.getBalance(k.publicKey)) / 1e9;
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -50,7 +51,10 @@ console.log("Kupujący zasileni po 0.15 SOL");
 const offerId = BigInt(Date.now());
 const offer = offerPda(seller.publicKey, offerId);
 let sig = await send(
-  createOfferIx(seller.publicKey, offerId, toLamports(1000), toLamports(800), 20n, 0n),
+  [
+    createOfferIx(seller.publicKey, offerId, toLamports(1000), toLamports(800), 20n, 0n),
+    titleMemoIx(seller.publicKey, "Kurs: Solana i Anchor od podstaw (smoke)"),
+  ],
   seller,
 );
 console.log("create_offer", sig);

@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router'
 import { useConnection, useWallet } from '@solana/wallet-adapter-react'
 import { WalletMultiButton } from '@solana/wallet-adapter-react-ui'
 import { DEFAULT_NAME, loadNames, saveName } from '../names'
-import { createOfferIx, fetchSellerOffers, fmtZl, offerPda, toLamports, type Offer } from '../program'
+import { createOfferIx, fetchSellerOffers, fmtZl, offerPda, readTitles, titleMemoIx, toLamports, type Offer } from '../program'
 import { useRefreshOnTx, useTx } from '../shell'
 
 export function Seller() {
@@ -43,7 +43,7 @@ function MyOffers() {
   }, [connection, publicKey])
   useRefreshOnTx(load)
   if (!publicKey || !offers || offers.length === 0) return null
-  const names = loadNames()
+  const names = { ...readTitles(), ...loadNames() }
   const sorted = [...offers].sort((a, b) => Number(b.offerId - a.offerId))
   return (
     <section className="card">
@@ -87,10 +87,11 @@ function CreateOffer() {
     const offerId = BigInt(Date.now())
     const windowSecs = BigInt(windowLen * (unit === 'min' ? 60 : 86400))
     const eventStart = eventAt ? BigInt(Math.floor(new Date(eventAt).getTime() / 1000)) : 0n
-    const sig = await send(
-      'Utworzenie oferty',
+    // Nazwa trafia on-chain jako Memo w tej samej transakcji: widzą ją katalog i kupujący.
+    const sig = await send('Utworzenie oferty', [
       createOfferIx(publicKey, offerId, toLamports(price), toLamports(floor), windowSecs, eventStart),
-    )
+      titleMemoIx(publicKey, title),
+    ])
     if (sig) {
       const addr = offerPda(publicKey, offerId).toBase58()
       saveName(addr, title)
