@@ -1,0 +1,24 @@
+skip_local_validator = true
+
+[toolchain]
+anchor_version = "1.2.0"
+solana_version = "3.1.10"
+
+[features]
+resolution = true
+skip-lint = false
+
+[programs.localnet]
+bezposrednik = "44sG9n516FQKsDNC2uwyKPUKSksyDLH4ypzsVHgJGGB7"
+
+[programs.devnet]
+bezposrednik = "44sG9n516FQKsDNC2uwyKPUKSksyDLH4ypzsVHgJGGB7"
+
+[provider]
+cluster = "localnet"
+wallet = "~/.config/solana/id.json"
+
+[scripts]
+test = "cargo test"
+
+[hooks]
