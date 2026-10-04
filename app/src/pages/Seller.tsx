@@ -18,9 +18,9 @@ export function Seller() {
         </p>
       </section>
       <div className="cards3">
-        <div className="pain"><span className="pain-icon">💰</span><b>Pieniądze od razu</b><span>Floor (np. 80–90% ceny) trafia do Ciebie w chwili sprzedaży.</span></div>
-        <div className="pain"><span className="pain-icon">📊</span><b>Maksymalny koszt = rezerwa</b><span>Nigdy nie oddasz więcej niż cena − floor. Symulator pokaże koszt każdej obniżki.</span></div>
-        <div className="pain"><span className="pain-icon">🚀</span><b>Klienci nie czekają</b><span>„Kup teraz, nie stracisz na promocji” zamienia odkładanie zakupu w sprzedaż dziś.</span></div>
+        <div className="pain"><span className="pain-icon">I.</span><b>Pieniądze od razu</b><span>Floor (np. 80–90% ceny) trafia do Ciebie w chwili sprzedaży.</span></div>
+        <div className="pain"><span className="pain-icon">II.</span><b>Maksymalny koszt = rezerwa</b><span>Nigdy nie oddasz więcej niż cena − floor. Symulator pokaże koszt każdej obniżki.</span></div>
+        <div className="pain"><span className="pain-icon">III.</span><b>Klienci nie czekają</b><span>„Kup teraz, nie stracisz na promocji” zamienia odkładanie zakupu w sprzedaż dziś.</span></div>
       </div>
       <div className="section" />
       <MyOffers />
@@ -121,7 +121,7 @@ function CreateOffer() {
         </label>
       </div>
       <div className="callout">
-        🛡️ Gwarancja ceny <b>do {pct}%</b>. Z każdej sprzedaży {fmtZl(toLamports(floor))} trafia od razu do Ciebie,{' '}
+        Gwarancja ceny <b>do {pct}%</b>. Z każdej sprzedaży {fmtZl(toLamports(floor))} trafia od razu do Ciebie,{' '}
         {fmtZl(toLamports(Math.max(price - floor, 0)))} czeka w rezerwie. To Twój maksymalny koszt na kupującego.
         Rozsądnie: 10–20%.
       </div>

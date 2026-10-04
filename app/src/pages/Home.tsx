@@ -20,9 +20,9 @@ export function Home() {
             <Link className="btn secondary big" to="/sprzedawca">Jestem sprzedawcą</Link>
           </div>
           <ul className="trust">
-            <li>🔒 Rezerwa w programie, nie u sprzedawcy</li>
-            <li>⚡ Zwrot bez reklamacji</li>
-            <li>🔎 Historia cen publiczna</li>
+            <li>Rezerwa w programie, nie u sprzedawcy</li>
+            <li>Zwrot bez reklamacji</li>
+            <li>Historia cen publiczna</li>
           </ul>
         </div>
         <div className="card hero-card" id="ochrona">

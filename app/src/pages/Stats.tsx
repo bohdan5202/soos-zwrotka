@@ -15,16 +15,6 @@ import {
 } from '../program'
 import { useTx } from '../shell'
 
-function Stat({ label, value, hint, tone }: { label: string; value: string; hint?: string; tone?: 'ok' | 'warn' }) {
-  return (
-    <div className={`stat ${tone ?? ''}`}>
-      <div className="stat-label">{label}</div>
-      <div className="stat-value">{value}</div>
-      {hint && <div className="stat-hint">{hint}</div>}
-    </div>
-  )
-}
-
 /** Publiczne statystyki protokołu: stan wszystkich kont programu, bez backendu. */
 export function Stats() {
   const { connection } = useConnection()
@@ -94,13 +84,19 @@ export function Stats() {
         <section className="card muted">Liczę…</section>
       ) : (
         <>
-          <div className="stats kpis">
-            <Stat label="Zablokowane w rezerwach" value={fmtZl(s.locked)} hint="gotowe na zwroty, poza zasięgiem sprzedawców" tone="ok" />
-            <Stat label="Należne kupującym teraz" value={fmtZl(s.owed)} hint="po obniżkach cen" tone={s.owed > 0n ? 'warn' : undefined} />
-            <Stat label="Aktywne zakupy" value={String(s.purchases)} hint={`${s.inWindow} z otwartym oknem · ${fmtZl(s.paid)}`} />
-            <Stat label="Oferty" value={String(s.offers)} hint={`${s.open} w sprzedaży · ${s.sellers} sprzedawców`} />
-            <Stat label="Kupujący z ochroną" value={String(s.buyers)} />
-          </div>
+          <section className="index-band">
+            <div className="index-main">
+              <div className="eyebrow">Indeks Zwrotki · zablokowane w rezerwach</div>
+              <div className="index-value">{fmtZl(s.locked)}</div>
+              <p className="muted small">Gotowe na zwroty, poza zasięgiem sprzedawców. Stan na {new Date(now * 1000).toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' })}.</p>
+            </div>
+            <dl className="index-side">
+              <div><dt>Należne kupującym teraz</dt><dd className={s.owed > 0n ? 'ok-text' : ''}>{fmtZl(s.owed)}<small>po obniżkach cen</small></dd></div>
+              <div><dt>Aktywne zakupy</dt><dd>{s.purchases}<small>{s.inWindow} z otwartym oknem · {fmtZl(s.paid)}</small></dd></div>
+              <div><dt>Oferty</dt><dd>{s.offers}<small>{s.open} w sprzedaży · {s.sellers} sprzedawców</small></dd></div>
+              <div><dt>Kupujący z ochroną</dt><dd>{s.buyers}</dd></div>
+            </dl>
+          </section>
           <section className="card">
             <h2>Największe rezerwy</h2>
             {s.top.length === 0 ? (

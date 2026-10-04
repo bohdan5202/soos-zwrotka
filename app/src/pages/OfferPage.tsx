@@ -12,6 +12,7 @@ import {
   fetchPurchase,
   fetchPurchases,
   fetchRefundRequests,
+  liveRequests,
   purchasePda,
   type Offer,
   type Purchase,
@@ -34,13 +35,17 @@ export function OfferPage() {
       return null
     }
   }, [address])
-  // Kolejność: link (?name=) → nazwa zapisana u sprzedawcy → Memo on-chain → domyślna.
+  // Kolejność: Memo on-chain (podpisane przez sprzedawcę) → nazwa zapisana w tej przeglądarce
+  // → link (?name=, każdy może go podrobić, więc oznaczamy jako niepotwierdzoną) → domyślna.
   const [chainTitle, setChainTitle] = useState<string | null>(null)
   useEffect(() => {
     setChainTitle(null)
     if (offerAddr) fetchOfferTitle(connection, offerAddr).then(setChainTitle).catch(() => {})
   }, [connection, offerAddr])
-  const name = search.get('name') ?? loadNames()[address] ?? chainTitle ?? DEFAULT_NAME
+  const trusted = chainTitle ?? loadNames()[address] ?? null
+  const linkName = search.get('name')
+  const name = trusted ?? linkName ?? DEFAULT_NAME
+  const nameUnverified = trusted === null && linkName !== null
 
   const [offer, setOffer] = useState<Offer | null>(null)
   const [loaded, setLoaded] = useState(false)
@@ -56,9 +61,10 @@ export function OfferPage() {
     setOffer(o)
     setLoaded(true)
     if (!o) return
-    setPurchases(await fetchPurchases(connection, offerAddr))
+    const ps = await fetchPurchases(connection, offerAddr)
+    setPurchases(ps)
     setMine(publicKey ? await fetchPurchase(connection, purchasePda(offerAddr, publicKey)) : null)
-    setRequests(await fetchRefundRequests(connection, offerAddr))
+    setRequests(liveRequests(await fetchRefundRequests(connection, offerAddr), ps))
   }, [connection, offerAddr, publicKey])
 
   const refreshActivity = useCallback(async () => {
@@ -109,6 +115,7 @@ export function OfferPage() {
     <OfferView
       offer={offer}
       name={name}
+      nameUnverified={nameUnverified}
       purchases={purchases}
       mine={mine}
       requests={requests}

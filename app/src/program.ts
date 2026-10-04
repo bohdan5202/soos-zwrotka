@@ -5,6 +5,7 @@ import {
   PublicKey,
   SystemProgram,
   TransactionInstruction,
+  type ConfirmedSignatureInfo,
 } from "@solana/web3.js";
 import { Buffer } from "buffer";
 
@@ -80,6 +81,8 @@ export type Offer = {
   history: PricePoint[];
   /** Sprzedaż zakończona (close_sales). */
   closed: boolean;
+  /** Ile zmian ceny mieści konto (starsze konta: 31, nowe: 32), jak `Offer::history_capacity`. */
+  maxChanges: number;
 };
 
 export type RefundRequest = {
@@ -160,7 +163,21 @@ export function decodeOffer(address: PublicKey, data: Uint8Array): Offer {
   for (let i = 0; i < len; i++) history.push({ ts: r.i64(), price: r.u64() });
   r.u8(); // bump
   const closed = r.u8() === 1; // starsze konta: zero z niewykorzystanego miejsca → false
-  return { address, seller, offerId, price, floor, windowSecs, eventStart, history, closed };
+  const maxChanges = Math.min(MAX_PRICE_CHANGES, Math.floor((data.length - OFFER_FIXED) / 16));
+  return { address, seller, offerId, price, floor, windowSecs, eventStart, history, closed, maxChanges };
+}
+
+const MAX_PRICE_CHANGES = 32;
+/** Bajty konta Offer poza wpisami historii: dyskryminator, pola, długość Vec, bump, closed. */
+const OFFER_FIXED = 8 + 32 + 8 * 5 + 4 + 1 + 1;
+
+/** Koniec gwarancji dla zakupu w chwili `now`: ta sama reguła co w `buy`. */
+export function windowEndIfBoughtAt(offer: Offer, now: number): number {
+  const w = Number(offer.windowSecs);
+  const e = Number(offer.eventStart);
+  if (w > 0 && e > 0) return Math.min(now + w, e);
+  if (w > 0) return now + w;
+  return e;
 }
 
 export function decodeRefundRequest(address: PublicKey, data: Uint8Array): RefundRequest {
@@ -193,6 +210,19 @@ export async function fetchRefundRequests(c: Connection, offer: PublicKey) {
     by.set(q.purchase.toBase58(), q);
   }
   return by;
+}
+
+/**
+ * Tylko prośby dotyczące aktywnych zakupów. Stary program nie zamykał prośby przy `release`,
+ * więc pod adresem ponownego zakupu może leżeć prośba z poprzedniego (złożona przed nim).
+ */
+export function liveRequests(requests: Map<string, RefundRequest>, purchases: Purchase[]) {
+  const live = new Map<string, RefundRequest>();
+  for (const p of purchases) {
+    const q = requests.get(p.address.toBase58());
+    if (q && q.requestedAt >= p.boughtAt) live.set(p.address.toBase58(), q);
+  }
+  return live;
 }
 
 export function decodePurchase(address: PublicKey, data: Uint8Array): Purchase {
@@ -315,11 +345,9 @@ export async function fetchSellerOffers(c: Connection, seller: PublicKey) {
   return accs.map((a) => decodeOffer(a.pubkey, a.account.data));
 }
 
-/** Czas utworzenia oferty (blockTime najstarszej transakcji konta). */
+/** Czas utworzenia oferty (blockTime transakcji create_offer). */
 export async function fetchCreatedAt(c: Connection, address: PublicKey) {
-  const sigs = await c.getSignaturesForAddress(address, { limit: 1000 });
-  const oldest = sigs[sigs.length - 1];
-  return oldest?.blockTime ?? null;
+  return (await findCreation(c, address))?.blockTime ?? null;
 }
 
 export async function fetchPurchases(c: Connection, offer: PublicKey) {
@@ -423,6 +451,7 @@ export function releaseIx(offer: Offer, purchase: Purchase) {
       { pubkey: purchase.address, isSigner: false, isWritable: true },
       { pubkey: purchase.buyer, isSigner: false, isWritable: true },
       { pubkey: offer.seller, isSigner: false, isWritable: true },
+      { pubkey: requestPda(purchase.address), isSigner: false, isWritable: true },
     ],
     data: concat(DISC.release),
   });
@@ -461,10 +490,10 @@ export function requestRefundIx(buyer: PublicKey, purchase: PublicKey, reason: s
 
 /**
  * Sprzedawca oddaje kupującemu `amount`: całą pozostałą rezerwę, resztę dopłaca sam.
- * Zakup (i ewentualna prośba o zwrot) się zamyka. Brak prośby = PROGRAM_ID w miejscu
- * opcjonalnego konta (konwencja Anchora).
+ * Zakup (i ewentualna prośba o zwrot) się zamyka. Adres prośby podajemy zawsze:
+ * program zamyka ją, jeśli istnieje.
  */
-export function refundPurchaseIx(seller: PublicKey, offer: PublicKey, p: Purchase, amount: bigint, hasRequest: boolean) {
+export function refundPurchaseIx(seller: PublicKey, offer: PublicKey, p: Purchase, amount: bigint) {
   return new TransactionInstruction({
     programId: PROGRAM_ID,
     keys: [
@@ -472,9 +501,7 @@ export function refundPurchaseIx(seller: PublicKey, offer: PublicKey, p: Purchas
       { pubkey: offer, isSigner: false, isWritable: false },
       { pubkey: p.address, isSigner: false, isWritable: true },
       { pubkey: p.buyer, isSigner: false, isWritable: true },
-      hasRequest
-        ? { pubkey: requestPda(p.address), isSigner: false, isWritable: true }
-        : { pubkey: PROGRAM_ID, isSigner: false, isWritable: false },
+      { pubkey: requestPda(p.address), isSigner: false, isWritable: true },
       { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
     ],
     data: concat(DISC.refundPurchase, u64(amount)),
@@ -527,7 +554,8 @@ export async function fetchAllPurchasesByOffer(c: Connection) {
 }
 
 // Nazwa w transakcji utworzenia się nie zmienia, więc trzymamy ją w localStorage na stałe.
-const TITLE_CACHE = "zwrotka:titles";
+// v2: stary cache mógł zapisać null albo nazwę z niewłaściwej transakcji.
+const TITLE_CACHE = "zwrotka:titles:v2";
 export function readTitles(): Record<string, string | null> {
   try {
     return JSON.parse(localStorage.getItem(TITLE_CACHE) ?? "{}");
@@ -536,23 +564,74 @@ export function readTitles(): Record<string, string | null> {
   }
 }
 
-/** Nazwa oferty z Memo w najstarszej transakcji konta; null, jeśli oferta jej nie ma. */
+type Creation = { blockTime: number | null; title: string | null };
+const creations = new Map<string, Promise<Creation | null>>();
+
+/**
+ * Transakcja utworzenia oferty: najstarsza udana z instrukcją create_offer dla tego konta.
+ * Przeglądamy całą historię (nie tylko ostatnie 1000 podpisów) i pomijamy wcześniejsze
+ * transakcje na przewidywalny adres PDA. Nazwę bierzemy tylko z Memo podpisanego przez sprzedawcę.
+ * null = nie udało się ustalić (np. RPC jeszcze nie ma transakcji): nie zapisujemy w cache.
+ */
+function findCreation(c: Connection, offer: PublicKey): Promise<Creation | null> {
+  const key = offer.toBase58();
+  let p = creations.get(key);
+  if (!p) {
+    p = loadCreation(c, offer).then((r) => {
+      if (!r) creations.delete(key);
+      return r;
+    }, (e) => {
+      creations.delete(key);
+      throw e;
+    });
+    creations.set(key, p);
+  }
+  return p;
+}
+
+async function loadCreation(c: Connection, offer: PublicKey): Promise<Creation | null> {
+  const sigs: ConfirmedSignatureInfo[] = [];
+  let before: string | undefined;
+  for (;;) {
+    const page = await c.getSignaturesForAddress(offer, { limit: 1000, before });
+    sigs.push(...page);
+    if (page.length < 1000) break;
+    before = page[page.length - 1].signature;
+  }
+  const oldestOk = sigs.reverse().filter((s) => !s.err).slice(0, 10);
+  for (const s of oldestOk) {
+    const tx = await c.getTransaction(s.signature, { maxSupportedTransactionVersion: 0 });
+    if (!tx) return null;
+    const keys = tx.transaction.message.staticAccountKeys;
+    const ixs = tx.transaction.message.compiledInstructions;
+    const create = ixs.find(
+      (ix) =>
+        keys[ix.programIdIndex]?.equals(PROGRAM_ID) &&
+        hasDisc(ix.data, DISC.createOffer) &&
+        keys[ix.accountKeyIndexes[1]]?.equals(offer),
+    );
+    if (!create) continue;
+    const sellerIdx = create.accountKeyIndexes[0];
+    let title: string | null = null;
+    for (const ix of ixs) {
+      // Memo program wymaga podpisu każdego konta z listy: sprzedawca musiał ją podpisać.
+      if (!keys[ix.programIdIndex]?.equals(MEMO_PROGRAM_ID) || !ix.accountKeyIndexes.includes(sellerIdx)) continue;
+      const text = new TextDecoder().decode(ix.data);
+      if (text.startsWith(TITLE_PREFIX)) title = text.slice(TITLE_PREFIX.length);
+    }
+    return { blockTime: tx.blockTime ?? s.blockTime ?? null, title };
+  }
+  return null;
+}
+
+/** Nazwa oferty z Memo w transakcji utworzenia; null, jeśli oferta jej nie ma albo jeszcze jej nie znamy. */
 export async function fetchOfferTitle(c: Connection, offer: PublicKey): Promise<string | null> {
   const key = offer.toBase58();
   const cached = readTitles();
   if (key in cached) return cached[key];
-  const sigs = await c.getSignaturesForAddress(offer, { limit: 1000 });
-  const oldest = sigs[sigs.length - 1];
-  if (!oldest) return null;
-  const tx = await c.getTransaction(oldest.signature, { maxSupportedTransactionVersion: 0 });
-  if (!tx) return null; // nie zapisujemy: spróbujemy później
-  const keys = tx.transaction.message.staticAccountKeys;
-  let title: string | null = null;
-  for (const ix of tx.transaction.message.compiledInstructions) {
-    if (!keys[ix.programIdIndex].equals(MEMO_PROGRAM_ID)) continue;
-    const text = new TextDecoder().decode(ix.data);
-    if (text.startsWith(TITLE_PREFIX)) title = text.slice(TITLE_PREFIX.length);
-  }
+  const creation = await findCreation(c, offer);
+  if (!creation) return null; // nie zapisujemy: spróbujemy później
+  const title = creation.title;
   try {
     localStorage.setItem(TITLE_CACHE, JSON.stringify({ ...readTitles(), [key]: title }));
   } catch {

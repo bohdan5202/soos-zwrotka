@@ -58,7 +58,7 @@ console.log("Prośba o zwrot:", reqs.get(purchase.toBase58())?.reason);
 const p = (await fetchPurchase(c, purchase))!;
 const before = await c.getBalance(ania.publicKey);
 const sig = await send(
-  [closeSalesIx(seller.publicKey, offer), refundPurchaseIx(seller.publicKey, offer, p, p.paid, true)],
+  [closeSalesIx(seller.publicKey, offer), refundPurchaseIx(seller.publicKey, offer, p, p.paid)],
   seller,
 );
 console.log("Anulowanie:", sig);

@@ -30,6 +30,17 @@ pub struct Offer {
     pub closed: bool,
 }
 
+impl Offer {
+    /// Ile zmian ceny zmieści konto o długości `data_len`. Starsze konta (sprzed pola
+    /// `closed`) są o 1 bajt krótsze, więc mieszczą 31 zmian, nie 32: przy pełnej
+    /// historii zapis by się nie udał.
+    pub fn history_capacity(data_len: usize) -> usize {
+        let max = crate::constants::MAX_PRICE_CHANGES as usize;
+        let fixed = 8 + Offer::INIT_SPACE - max * PricePoint::INIT_SPACE;
+        (data_len.saturating_sub(fixed) / PricePoint::INIT_SPACE).min(max)
+    }
+}
+
 /// Prośba kupującego o zwrot (np. odwołane zajęcia). Osobne konto, żeby nie zmieniać
 /// układu `Purchase`. Decyzję podejmuje sprzedawca przez `refund_purchase`.
 #[account]

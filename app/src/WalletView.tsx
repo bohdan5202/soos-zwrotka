@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useConnection, useWallet } from '@solana/wallet-adapter-react'
 import { PublicKey } from '@solana/web3.js'
-import { fetchActivity, fetchWalletActivity, rolesIn, type ActivityEvent } from './activity'
+import { KIND, fetchActivity, fetchWalletActivity, fmtStamp, rolesIn, type ActivityEvent } from './activity'
 import { fmtIn } from './charts'
 import type { Send } from './shell'
 import { Link } from 'react-router'
@@ -21,7 +21,6 @@ import {
 } from './program'
 
 const short = (s: string) => `${s.slice(0, 4)}…${s.slice(-4)}`
-const fmtDate = (ts: number) => new Date(ts * 1000).toLocaleString('pl-PL')
 
 type SellerOffer = { offer: Offer; purchases: Purchase[] }
 type BuyerItem = { purchase: Purchase; offer: Offer | null }
@@ -152,8 +151,8 @@ export function WalletView({
           </div>
           <div className="roles">
             {loading && <span className="pill">Analizuję…</span>}
-            {isSeller && <span className="role seller-role">🏷️ Sprzedawca · {selling?.length ?? 0} ofert</span>}
-            {isBuyer && <span className="role">🛒 Kupujący · {buying?.length ?? 0} aktywnych zakupów</span>}
+            {isSeller && <span className="role seller-role">Sprzedawca · {selling?.length ?? 0} ofert</span>}
+            {isBuyer && <span className="role">Kupujący · {buying?.length ?? 0} aktywnych zakupów</span>}
             {!loading && !isSeller && !isBuyer && events !== null && <span className="pill">Ten portfel nie korzystał jeszcze ze Zwrotki</span>}
           </div>
         </div>
@@ -173,7 +172,7 @@ export function WalletView({
           {buyerDue > 0n && (
             <section className="card buyer claim-all">
               <div>
-                <div className="due yes">💸 {fmtZl(buyerDue)} do odebrania</div>
+                <div className="due yes">{fmtZl(buyerDue)} do odebrania</div>
                 <p className="muted small">z {claimable.length} zakupów, w których cena spadła</p>
               </div>
               <button
@@ -187,7 +186,7 @@ export function WalletView({
           )}
           {isBuyer && (
             <section className="card">
-              <h2>🛒 Jako kupujący</h2>
+              <h2>Jako kupujący</h2>
               <div className="stats">
                 <Stat label="Wydane przez Zwrotkę" value={events ? fmtZl(buyerSpent) : '…'} hint="ostatnie transakcje" />
                 <Stat label="Chronione teraz" value={fmtZl(buyerProtected)} hint="rezerwa czeka na Ciebie" tone="ok" />
@@ -198,7 +197,7 @@ export function WalletView({
           )}
           {isSeller && (
             <section className="card seller">
-              <h2>🏷️ Jako sprzedawca</h2>
+              <h2>Jako sprzedawca</h2>
               <div className="stats">
                 <Stat label="Przychód" value={events ? fmtZl(sellerRevenue) : '…'} hint="ostatnie transakcje" />
                 <Stat label="Otrzymane" value={events ? fmtZl(sellerReceived) : '…'} hint="floor + rozliczone rezerwy" tone="ok" />
@@ -283,20 +282,19 @@ export function WalletView({
               {[...myEvents].reverse().map((e, i) => {
                 const roles = rolesIn(e, addr)
                 return (
-                  <li key={`${e.sig}${i}`} className={e.failed ? 'failed' : ''}>
-                    <span className="ev-icon">{ICON[e.kind]}</span>
+                  <li key={`${e.sig}${i}`} className={`${KIND[e.kind].cls} ${e.failed ? 'failed' : ''}`}>
+                    <time className="ev-time">{fmtStamp(e.ts)}</time>
+                    <span className="ev-kind">{KIND[e.kind].label}</span>
                     <div className="ev-body">
                       <div>
                         {roles.map((r) => (
                           <span key={r} className={`role mini ${r === 'seller' ? 'seller-role' : ''}`}>{r === 'seller' ? 'sprzedawca' : 'kupujący'}</span>
                         ))}{' '}
                         {describe(e)}
-                        {e.offer && <> · <Link to={`/oferta/${e.offer}`}>{nameOf(e.offer)}</Link></>}
+                        {e.offer && <> · <Link to={`/oferta/${e.offer}`}>{nameOf(e.offer)}</Link></>}{' '}
+                        <a className="small" href={explorerTx(e.sig)} target="_blank" rel="noreferrer">tx ↗</a>
                       </div>
-                      <div className="muted small">
-                        {fmtDate(e.ts)} · <a href={explorerTx(e.sig)} target="_blank" rel="noreferrer">transakcja ↗</a>
-                        {roles.length === 0 && ' · wywołane przez ten portfel w cudzej sprawie'}
-                      </div>
+                      {roles.length === 0 && <div className="muted small">wywołane przez ten portfel w cudzej sprawie</div>}
                     </div>
                   </li>
                 )
@@ -307,10 +305,6 @@ export function WalletView({
       )}
     </>
   )
-}
-
-const ICON: Record<ActivityEvent['kind'], string> = {
-  create: '✨', buy: '🛒', price: '🏷️', refund: '💸', release: '🔓', sellerRefund: '↩️', closeSales: '⛔',
 }
 
 function describe(e: ActivityEvent) {

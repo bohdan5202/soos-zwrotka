@@ -1,11 +1,11 @@
 import { Fragment, useMemo, useState } from 'react'
-import { useWallet } from '@solana/wallet-adapter-react'
+import { useConnection, useWallet } from '@solana/wallet-adapter-react'
 import { WalletMultiButton } from '@solana/wallet-adapter-react-ui'
 import type { PublicKey } from '@solana/web3.js'
-import { totals, type ActivityEvent } from './activity'
+import { KIND, fmtStamp, totals, type ActivityEvent } from './activity'
 import type { Send } from './shell'
 import { LineChart, MoneySplit, UnlockSchedule, fmtIn } from './charts'
-import { PriceChart } from './PriceChart'
+import { PriceChart, PriceQuotes } from './PriceChart'
 import { ProtectionMeter, Stepper, type StepState } from './funnel'
 import {
   buyIx,
@@ -14,6 +14,7 @@ import {
   due,
   explorerAddr,
   explorerTx,
+  fetchPurchases,
   fmtZl,
   minRefund,
   refundPurchaseIx,
@@ -28,11 +29,14 @@ import {
   type Offer,
   type Purchase,
   type RefundRequest,
+  windowEndIfBoughtAt,
 } from './program'
 
 type Props = {
   offer: Offer
   name: string
+  /** Nazwa tylko z parametru ?name= (bez potwierdzenia on-chain). */
+  nameUnverified?: boolean
   purchases: Purchase[]
   mine: Purchase | null
   /** Prośby o zwrot, klucz = adres zakupu. */
@@ -90,9 +94,9 @@ export function OfferView(p: Props & { tab: string; onTab: (slug: string) => voi
 
   return (
     <>
-      <ProductCard offer={p.offer} name={p.name} isSeller={p.isSeller} />
+      <ProductCard offer={p.offer} name={p.name} nameUnverified={!!p.nameUnverified} isSeller={p.isSeller} />
       {p.offer.closed && (
-        <div className="notice">⛔ Sprzedaż zakończona: nowych zakupów nie ma. Istniejące zakupy i ich rezerwy działają dalej.</div>
+        <div className="notice">Sprzedaż zakończona: nowych zakupów nie ma. Istniejące zakupy i ich rezerwy działają dalej.</div>
       )}
       <nav className="tabs" role="tablist">
         {tabs.map((t) => (
@@ -118,7 +122,7 @@ export function OfferView(p: Props & { tab: string; onTab: (slug: string) => voi
 
 // ---------- Karta produktu ----------
 
-function ProductCard({ offer, name, isSeller }: { offer: Offer; name: string; isSeller: boolean }) {
+function ProductCard({ offer, name, nameUnverified, isSeller }: { offer: Offer; name: string; nameUnverified: boolean; isSeller: boolean }) {
   const maxRefund = offer.price > offer.floor ? offer.price - offer.floor : 0n
   const pct = Math.round((Number(maxRefund) * 100) / Number(offer.price || 1n))
   const [copied, setCopied] = useState(false)
@@ -129,6 +133,9 @@ function ProductCard({ offer, name, isSeller }: { offer: Offer; name: string; is
         <div>
           <div className="eyebrow">{isSeller ? 'Twoja oferta' : 'Oferta'}</div>
           <h1>{name}</h1>
+          {nameUnverified && (
+            <div className="muted small">Nazwa pochodzi z linku, nie z blockchaina: sprzedawca jej nie potwierdził.</div>
+          )}
         </div>
         <div className="price-box">
           <div className="price">{fmtZl(offer.price)}</div>
@@ -136,7 +143,7 @@ function ProductCard({ offer, name, isSeller }: { offer: Offer; name: string; is
         </div>
       </div>
       <div className="badge">
-        <span>🛡️</span>
+        <span></span>
         <div>
           <b>Gwarancja ceny{pct > 0 && <> do {pct}%</>}</b>
           <div className="small">
@@ -184,7 +191,7 @@ function SellerOverview({ offer, purchases, requests, events, now, busy, send, g
     <>
       {requests.size > 0 && (
         <div className="notice warn-notice">
-          📩 Prośby o zwrot: <b>{requests.size}</b>.{' '}
+          Prośby o zwrot: <b>{requests.size}</b>.{' '}
           <button className="link" onClick={() => goTo('kupujacy')}>Zobacz kupujących →</button>
         </div>
       )}
@@ -210,7 +217,7 @@ function SellerOverview({ offer, purchases, requests, events, now, busy, send, g
         </div>
         <EventList events={events ? events.slice(-5).reverse() : null} offer={offer} />
       </section>
-      <CancelOfferCard offer={offer} purchases={purchases} requests={requests} busy={busy} send={send} />
+      <CancelOfferCard offer={offer} purchases={purchases} busy={busy} send={send} />
     </>
   )
 }
@@ -220,28 +227,31 @@ function SellerOverview({ offer, purchases, requests, events, now, busy, send, g
  * refund_purchase (pełny zwrot) dla każdego zakupu, po kilka w jednej transakcji.
  */
 function CancelOfferCard({
-  offer, purchases, requests, busy, send,
-}: { offer: Offer; purchases: Purchase[]; requests: Map<string, RefundRequest>; busy: boolean; send: Send }) {
+  offer, purchases, busy, send,
+}: { offer: Offer; purchases: Purchase[]; busy: boolean; send: Send }) {
   const { publicKey } = useWallet()
+  const { connection } = useConnection()
   const [confirm, setConfirm] = useState(false)
   const total = purchases.reduce((s, p) => s + p.paid - p.claimed, 0n)
   const topUp = purchases.reduce((s, p) => s + sellerTopUp(p, p.paid - p.claimed), 0n)
 
   const cancelAll = async () => {
     if (!publicKey) return
-    const refunds = purchases.map((p) =>
-      refundPurchaseIx(publicKey, offer.address, p, p.paid - p.claimed, requests.has(p.address.toBase58())),
-    )
-    // Do 5 zwrotów na transakcję (limit rozmiaru); pierwsza zamyka też sprzedaż.
-    const first = offer.closed ? [] : [closeSalesIx(publicKey, offer.address)]
-    const chunks: (typeof refunds)[] = []
-    for (let i = 0; i < refunds.length; i += 5) chunks.push(refunds.slice(i, i + 5))
-    if (chunks.length === 0) chunks.push([])
-    for (let i = 0; i < chunks.length; i++) {
-      const ixs = i === 0 ? [...first, ...chunks[i]] : chunks[i]
-      if (ixs.length === 0) continue
-      const sig = await send(`Anulowanie oferty (${i + 1}/${chunks.length})`, ixs)
+    // Najpierw zamykamy sprzedaż: od tej chwili lista zakupów już się nie wydłuży.
+    if (!offer.closed && !(await send('Zakończenie sprzedaży', closeSalesIx(publicKey, offer.address)))) return
+    // Zakupy i kwoty bierzemy ze świeżego stanu przed każdą paczką (do 5 na transakcję):
+    // claim_difference może wywołać każdy, a zwrot ponad paid − claimed program odrzuca.
+    const done = new Set<string>()
+    for (let n = 1; n <= 100; n++) {
+      const left = (await fetchPurchases(connection, offer.address)).filter((p) => !done.has(p.address.toBase58()))
+      if (left.length === 0) break
+      const batch = left.slice(0, 5)
+      const sig = await send(
+        `Anulowanie oferty: zwroty (${n})`,
+        batch.map((p) => refundPurchaseIx(publicKey, offer.address, p, p.paid - p.claimed)),
+      )
       if (!sig) return
+      batch.forEach((p) => done.add(p.address.toBase58()))
     }
     setConfirm(false)
   }
@@ -288,7 +298,7 @@ function QuickPrice({
   const priceZl = toZl(offer.price)
   const [target, setTarget] = useState(Math.round(priceZl * 0.85))
   const sim = simulatePriceCost(offer, purchases, toLamports(target), now)
-  const changesLeft = 32 - offer.history.length
+  const changesLeft = offer.maxChanges - offer.history.length
   return (
     <section className="card">
       <div className="spread">
@@ -392,6 +402,12 @@ function Analytics({ offer, purchases, events, createdAt, now, isSeller }: Props
           now={now}
           initialPrice={events?.find((e) => e.kind === 'create')?.amount ?? null}
         />
+        <PriceQuotes
+          offer={offer}
+          purchases={purchases}
+          createdAt={createdAt}
+          initialPrice={events?.find((e) => e.kind === 'create')?.amount ?? null}
+        />
       </section>
       <div className="grid2 even">
         <section className="card">
@@ -482,7 +498,7 @@ function RequestRefundCard({
   if (request) {
     return (
       <section className="card notice-card">
-        <b>📩 Prośba o zwrot wysłana</b>
+        <b>Prośba o zwrot wysłana</b>
         <p className="muted small">
           „{request.reason || 'bez powodu'}” · {fmtDate(request.requestedAt)}. Sprzedawca widzi ją w swoim panelu. Jeśli się
           zgodzi, pieniądze wrócą automatycznie z rezerwy i jego dopłaty.
@@ -532,6 +548,9 @@ function BuyerPanel({ offer, mine, requests, now, busy, send }: Props) {
     const toSeller = offer.price < offer.floor ? offer.price : offer.floor
     // Po starcie wydarzenia zakup nie miałby gwarancji: program go odrzuca.
     const eventStarted = offer.eventStart > 0n && Number(offer.eventStart) <= now
+    // Faktyczne okno przy zakupie teraz: program skraca je do startu wydarzenia.
+    const guaranteeSecs = windowEndIfBoughtAt(offer, now) - now
+    const cappedByEvent = offer.eventStart > 0n && (offer.windowSecs === 0n || now + Number(offer.windowSecs) > Number(offer.eventStart))
     return (
       <>
         <BuyerSteps connected={!!publicKey} bought={false} active={false} refunded={false} />
@@ -543,9 +562,9 @@ function BuyerPanel({ offer, mine, requests, now, busy, send }: Props) {
             <div className="muted small">Cena dziś</div>
             <div className="price">{fmtZl(offer.price)}</div>
             <ul className="checks">
-              <li>✓ Ochrona do {fmtZl(offer.price - toSeller)} przez {offer.windowSecs > 0n ? fmtDuration(Number(offer.windowSecs)) : 'okres oferty'}</li>
-              <li>✓ Rezerwa zablokowana w programie, nie u sprzedawcy</li>
-              <li>✓ Zwrot jednym kliknięciem albo automatycznie</li>
+              <li>Ochrona do {fmtZl(offer.price - toSeller)} przez {cappedByEvent ? `${fmtLeft(guaranteeSecs)} (do startu wydarzenia)` : fmtDuration(Number(offer.windowSecs))}</li>
+              <li>Rezerwa zablokowana w programie, nie u sprzedawcy</li>
+              <li>Zwrot jednym kliknięciem albo automatycznie</li>
             </ul>
             {offer.closed ? (
               <button className="big wide" disabled>Sprzedaż zakończona</button>
@@ -585,7 +604,7 @@ function BuyerPanel({ offer, mine, requests, now, busy, send }: Props) {
         <Stat label="Już odebrano" value={fmtZl(mine.claimed)} />
       </div>
       <div className={`due ${d > 0n ? 'yes' : ''}`}>
-        {d > 0n ? <>💸 {fmtZl(d)} do odebrania</> : 'Cena nie spadła: nic do odebrania'}
+        {d > 0n ? <>{fmtZl(d)} do odebrania</> : 'Cena nie spadła: nic do odebrania'}
       </div>
       <div className="inline">
         <button className="big" disabled={busy || d === 0n} onClick={() => send(`Zwrot różnicy ${fmtZl(d)}`, claimIx(offer.address, mine))}>
@@ -648,7 +667,7 @@ function PurchaseList({ offer, purchases, requests, now, busy, send, isSeller }:
                   <tr className={req ? 'has-request' : ''}>
                     <td>
                       <a href={explorerAddr(p.buyer)} target="_blank" rel="noreferrer">{short(p.buyer)}</a>
-                      {req && <div className="req-badge" title={req.reason}>📩 prosi o zwrot{req.reason ? `: „${req.reason}”` : ''}</div>}
+                      {req && <div className="req-badge" title={req.reason}>prosi o zwrot{req.reason ? `: „${req.reason}”` : ''}</div>}
                     </td>
                     <td>{fmtTime(Number(p.boughtAt))}</td>
                     <td>{fmtZl(p.paid)}</td>
@@ -673,7 +692,7 @@ function PurchaseList({ offer, purchases, requests, now, busy, send, isSeller }:
                   {isSeller && refunding === key && (
                     <tr className="refund-row">
                       <td colSpan={8}>
-                        <RefundForm offer={offer} purchase={p} hasRequest={!!req} busy={busy} send={send} onDone={() => setRefunding(null)} />
+                        <RefundForm offer={offer} purchase={p} busy={busy} send={send} onDone={() => setRefunding(null)} />
                       </td>
                     </tr>
                   )}
@@ -689,8 +708,8 @@ function PurchaseList({ offer, purchases, requests, now, busy, send, isSeller }:
 
 /** Formularz anulowania jednego zakupu: pełny albo częściowy zwrot. */
 function RefundForm({
-  offer, purchase: p, hasRequest, busy, send, onDone,
-}: { offer: Offer; purchase: Purchase; hasRequest: boolean; busy: boolean; send: Send; onDone: () => void }) {
+  offer, purchase: p, busy, send, onDone,
+}: { offer: Offer; purchase: Purchase; busy: boolean; send: Send; onDone: () => void }) {
   const { publicKey } = useWallet()
   const max = p.paid - p.claimed
   const min = minRefund(p)
@@ -724,7 +743,7 @@ function RefundForm({
         disabled={busy || !valid || !publicKey}
         onClick={async () => {
           if (!publicKey) return
-          const sig = await send(`Anulowanie zakupu ${short(p.buyer)}: zwrot ${fmtZl(amount)}`, refundPurchaseIx(publicKey, offer.address, p, amount, hasRequest))
+          const sig = await send(`Anulowanie zakupu ${short(p.buyer)}: zwrot ${fmtZl(amount)}`, refundPurchaseIx(publicKey, offer.address, p, amount))
           if (sig) onDone()
         }}
       >
@@ -736,15 +755,6 @@ function RefundForm({
 
 // ---------- Historia ----------
 
-const KIND: Record<ActivityEvent['kind'], { icon: string; cls: string }> = {
-  create: { icon: '✨', cls: 'k-create' },
-  buy: { icon: '🛒', cls: 'k-buy' },
-  price: { icon: '🏷️', cls: 'k-price' },
-  refund: { icon: '💸', cls: 'k-refund' },
-  release: { icon: '🔓', cls: 'k-release' },
-  sellerRefund: { icon: '↩️', cls: 'k-refund' },
-  closeSales: { icon: '⛔', cls: 'k-price' },
-}
 
 function describe(e: ActivityEvent, offer: Offer) {
   const isSellerActor = e.actor === offer.seller.toBase58()
@@ -783,12 +793,13 @@ function EventList({ events, offer }: { events: ActivityEvent[] | null; offer?: 
     <ul className="events">
       {events.map((e, i) => (
         <li key={`${e.sig}${i}`} className={`${KIND[e.kind].cls} ${e.failed ? 'failed' : ''}`}>
-          <span className="ev-icon">{KIND[e.kind].icon}</span>
+          <time className="ev-time">{fmtStamp(e.ts)}</time>
+          <span className="ev-kind">{KIND[e.kind].label}</span>
           <div className="ev-body">
-            <div>{offer ? describe(e, offer) : e.kind}</div>
-            <div className="muted small">
-              {fmtDate(e.ts)} · <a href={explorerTx(e.sig)} target="_blank" rel="noreferrer">transakcja ↗</a>
-              {e.failed && ' · nieudana'}
+            <div>
+              {offer ? describe(e, offer) : e.kind}{' '}
+              <a className="small" href={explorerTx(e.sig)} target="_blank" rel="noreferrer">tx ↗</a>
+              {e.failed && <span className="muted small"> · nieudana</span>}
             </div>
           </div>
         </li>
@@ -800,8 +811,8 @@ function EventList({ events, offer }: { events: ActivityEvent[] | null; offer?: 
 function ActivityFeed({ events, offer }: { events: ActivityEvent[] | null; offer: Offer }) {
   return (
     <section className="card">
-      <h2>Historia on-chain</h2>
-      <p className="muted small">Każde zdarzenie to transakcja w Solana Explorer. Tej historii nikt nie może edytować.</p>
+      <h2>Kronika on-chain</h2>
+      <p className="muted small">Każdy wpis to transakcja w Solana Explorer. Tej historii nikt nie może edytować.</p>
       <EventList events={events ? [...events].reverse() : null} offer={offer} />
     </section>
   )

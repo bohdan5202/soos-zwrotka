@@ -101,17 +101,17 @@ export function FunnelSections() {
         <h2 className="section-title">Kupujesz na szczycie ceny? Każdy się tego boi.</h2>
         <div className="cards3">
           <div className="pain">
-            <span className="pain-icon">⏳</span>
+            <span className="pain-icon">I.</span>
             <b>Kupujący czekają</b>
             <span>„Kupię po Black Friday.” Kurs, bilet, przedsprzedaż — wszyscy odkładają zakup, bo boją się promocji tydzień później.</span>
           </div>
           <div className="pain">
-            <span className="pain-icon">📉</span>
+            <span className="pain-icon">II.</span>
             <b>Sprzedawca traci</b>
             <span>Pieniądze przychodzą później, nie wiadomo ile się sprzeda. Mały organizator nie ma jak przekonać, że nie obniży ceny.</span>
           </div>
           <div className="pain">
-            <span className="pain-icon">🤝</span>
+            <span className="pain-icon">III.</span>
             <b>Dzisiejsze gwarancje to obietnice</b>
             <span>Sprzedawca sam decyduje o zwrocie. Costco: „reserves the right to deny”. Alaska Airlines i JetBlue po prostu je wycofały.</span>
           </div>
@@ -122,10 +122,10 @@ export function FunnelSections() {
         <div className="eyebrow">Jak działa Zwrotka</div>
         <h2 className="section-title">Ochrona ceny zabezpieczona pieniędzmi, nie słowem</h2>
         <ol className="timeline">
-          <li><span>🛒</span><div><b>Kupujesz</b><p>Płacisz normalną cenę. Sprzedawca od razu dostaje większość (floor).</p></div></li>
-          <li><span>🔒</span><div><b>Rezerwa się blokuje</b><p>Reszta czeka w programie na Solanie. Sprzedawca nie może jej ruszyć.</p></div></li>
-          <li><span>🏷️</span><div><b>Cena spada?</b><p>Program sam zna każdą zmianę ceny. Nie musisz niczego śledzić ani udowadniać.</p></div></li>
-          <li><span>💸</span><div><b>Różnica wraca do Ciebie</b><p>Jednym kliknięciem albo automatycznie po końcu okna. Bez zgody sprzedawcy.</p></div></li>
+          <li><span>01</span><div><b>Kupujesz</b><p>Płacisz normalną cenę. Sprzedawca od razu dostaje większość (floor).</p></div></li>
+          <li><span>02</span><div><b>Rezerwa się blokuje</b><p>Reszta czeka w programie na Solanie. Sprzedawca nie może jej ruszyć.</p></div></li>
+          <li><span>03</span><div><b>Cena spada?</b><p>Program sam zna każdą zmianę ceny. Nie musisz niczego śledzić ani udowadniać.</p></div></li>
+          <li><span>04</span><div><b>Różnica wraca do Ciebie</b><p>Jednym kliknięciem albo automatycznie po końcu okna. Bez zgody sprzedawcy.</p></div></li>
         </ol>
       </section>
 

@@ -13,6 +13,7 @@ import {
   fetchRefundRequests,
   fetchSellerOffers,
   fmtZl,
+  liveRequests,
   readTitles,
   releaseIx,
   sellerStats,
@@ -55,7 +56,7 @@ export function Panel() {
         fetchRefundRequests(connection, o.address),
         fetchActivity(connection, o.address).catch(() => [] as ActivityEvent[]),
       ])
-      out.push({ offer: o, purchases, requests, events })
+      out.push({ offer: o, purchases, requests: liveRequests(requests, purchases), events })
     }
     setRows(out.sort((a, b) => Number(b.offer.offerId - a.offer.offerId)))
   }, [connection, publicKey])
@@ -160,10 +161,10 @@ export function Panel() {
       <section className="card">
         <h2>Status zakupów</h2>
         <div className="pipeline">
-          <div className="stage s-active"><b>{agg.inWindow.length}</b><span>🟢 W trakcie</span><small>okno gwarancji otwarte</small></div>
-          <div className="stage s-settle"><b>{agg.toSettle.length}</b><span>🟡 Do rozliczenia</span><small>okno minęło, czeka na release</small></div>
-          <div className="stage s-request"><b>{agg.requests.length}</b><span>🔴 Prośby o zwrot</span><small>czekają na Twoją decyzję</small></div>
-          <div className="stage s-done"><b>{agg.finished}</b><span>✅ Zakończone</span><small>rozliczone albo zwrócone</small></div>
+          <div className="stage s-active"><b>{agg.inWindow.length}</b><span>W trakcie</span><small>okno gwarancji otwarte</small></div>
+          <div className="stage s-settle"><b>{agg.toSettle.length}</b><span>Do rozliczenia</span><small>okno minęło, czeka na release</small></div>
+          <div className="stage s-request"><b>{agg.requests.length}</b><span>Prośby o zwrot</span><small>czekają na Twoją decyzję</small></div>
+          <div className="stage s-done"><b>{agg.finished}</b><span>Zakończone</span><small>rozliczone albo zwrócone</small></div>
         </div>
         <div className="inline actions-row">
           <button
@@ -184,7 +185,7 @@ export function Panel() {
           <ul className="req-list">
             {agg.requests.map(({ q, o }) => (
               <li key={q.address.toBase58()}>
-                📩 <b>{short(q.buyer.toBase58())}</b> w „{nameOf(o)}”: {q.reason || 'bez powodu'}{' '}
+                <b>{short(q.buyer.toBase58())}</b> w „{nameOf(o)}”: {q.reason || 'bez powodu'}{' '}
                 <Link to={`/oferta/${o.address.toBase58()}/kupujacy`}>rozpatrz →</Link>
               </li>
             ))}
@@ -207,7 +208,7 @@ export function Panel() {
                 return (
                   <tr key={o.address.toBase58()}>
                     <td><Link to={`/oferta/${o.address.toBase58()}`}>{nameOf(o)}</Link></td>
-                    <td><span className={`pill ${o.closed ? '' : 'ok'}`}>{status}</span>{requests.size > 0 && <span className="req-badge"> 📩 {requests.size}</span>}</td>
+                    <td><span className={`pill ${o.closed ? '' : 'ok'}`}>{status}</span>{requests.size > 0 && <span className="req-badge"> prośby: {requests.size}</span>}</td>
                     <td>{fmtZl(o.price)}</td>
                     <td>{t.sales}</td>
                     <td>{purchases.filter((p) => Number(p.windowEnd) > now).length}</td>

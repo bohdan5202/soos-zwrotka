@@ -66,10 +66,13 @@ function TxProvider({ children, onError }: { children: ReactNode; onError: (e: s
     setBusy(true)
     onError(null)
     try {
-      const tx = new Transaction().add(...(Array.isArray(ix) ? ix : [ix]))
-      const sig = await sendTransaction(tx, connection)
+      // Blockhash przed wysłaniem: ten sam trafia do transakcji i do potwierdzenia.
       const bh = await connection.getLatestBlockhash()
-      await connection.confirmTransaction({ signature: sig, ...bh }, 'confirmed')
+      const tx = new Transaction({ feePayer: publicKey, ...bh }).add(...(Array.isArray(ix) ? ix : [ix]))
+      const sig = await sendTransaction(tx, connection)
+      const res = await connection.confirmTransaction({ signature: sig, ...bh }, 'confirmed')
+      // confirmTransaction nie rzuca, gdy transakcja przepadła w programie: błąd jest w value.err.
+      if (res.value.err) throw new Error(`Transakcja odrzucona: ${JSON.stringify(res.value.err)}`)
       const id = Date.now()
       setToasts((t) => [{ id, label, sig }, ...t].slice(0, 3))
       setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 12000)
@@ -115,6 +118,41 @@ function Balance() {
   return sol === null ? null : <span className="muted small balance">{sol.toFixed(3)} SOL</span>
 }
 
+type Theme = 'light' | 'dark'
+const THEME_KEY = 'zwrotka:theme'
+const systemTheme = (): Theme => (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
+
+/** Jasny / ciemny. Bez wyboru użytkownika strona idzie za ustawieniem systemu. */
+function ThemeSwitch() {
+  const [theme, setTheme] = useState<Theme>(() => (document.documentElement.dataset.theme as Theme | undefined) ?? systemTheme())
+  useEffect(() => {
+    const mq = window.matchMedia('(prefers-color-scheme: dark)')
+    const follow = () => {
+      if (!document.documentElement.dataset.theme) setTheme(systemTheme())
+    }
+    mq.addEventListener('change', follow)
+    return () => mq.removeEventListener('change', follow)
+  }, [])
+  const choose = (t: Theme) => {
+    document.documentElement.dataset.theme = t
+    try {
+      localStorage.setItem(THEME_KEY, t)
+    } catch {
+      /* bez localStorage wybór działa do odświeżenia strony */
+    }
+    setTheme(t)
+  }
+  return (
+    <div className="theme-switch" role="group" aria-label="Motyw">
+      <button aria-pressed={theme === 'light'} onClick={() => choose('light')}>jasny</button>
+      <button aria-pressed={theme === 'dark'} onClick={() => choose('dark')}>ciemny</button>
+    </div>
+  )
+}
+
+const today = () =>
+  new Date().toLocaleDateString('pl-PL', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+
 export function Shell() {
   const [error, setError] = useState<string | null>(null)
   const { pathname } = useLocation()
@@ -144,9 +182,16 @@ export function Shell() {
         </nav>
         <div className="wallet">
           <Balance />
+          <ThemeSwitch />
           <WalletMultiButton />
         </div>
       </header>
+      <div className="edition-wrap">
+        <div className="edition">
+          <span>Wydanie devnet · gwarancja ceny bez pośrednika</span>
+          <span>{today()} · program <a href={explorerAddr(PROGRAM_ID)} target="_blank" rel="noreferrer" className="mono">44sG…GGB7</a></span>
+        </div>
+      </div>
 
       <main className="page">
         {error && (

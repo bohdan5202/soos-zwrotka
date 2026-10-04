@@ -4,8 +4,8 @@ use anchor_lang::system_program::{transfer, Transfer};
 use crate::{
     constants::*,
     error::ErrorCode,
-    instructions::move_lamports,
-    state::{Offer, Purchase, RefundRequest},
+    instructions::{close_refund_request, move_lamports},
+    state::{Offer, Purchase},
 };
 
 /// Sprzedawca anuluje jeden zakup i oddaje kupującemu `amount` (całość albo część).
@@ -23,14 +23,10 @@ pub struct RefundPurchase<'info> {
     /// CHECK: odbiorca zwrotu, zgodny z `purchase.buyer`.
     #[account(mut)]
     pub buyer: UncheckedAccount<'info>,
-    /// Prośba o zwrot, jeśli kupujący ją złożył: zamykana razem z zakupem.
-    #[account(
-        mut,
-        seeds = [REFUND_REQUEST_SEED, purchase.key().as_ref()],
-        bump = refund_request.bump,
-        close = buyer
-    )]
-    pub refund_request: Option<Account<'info, RefundRequest>>,
+    /// CHECK: adres prośby o zwrot tego zakupu (PDA); jeśli kupujący ją złożył,
+    /// zamykana razem z zakupem. Wymagany zawsze, żeby prośba nie została osierocona.
+    #[account(mut, seeds = [REFUND_REQUEST_SEED, purchase.key().as_ref()], bump)]
+    pub refund_request: UncheckedAccount<'info>,
     pub system_program: Program<'info, System>,
 }
 
@@ -70,6 +66,10 @@ pub fn handle_refund_purchase(ctx: Context<RefundPurchase>, amount: u64) -> Resu
             left,
         )?;
     }
+    close_refund_request(
+        &ctx.accounts.refund_request.to_account_info(),
+        &ctx.accounts.buyer.to_account_info(),
+    )?;
 
     msg!(
         "Refund by seller: {} to buyer ({} from reserve, {} from seller)",
