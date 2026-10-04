@@ -30,7 +30,7 @@ HackYeah 2026 · wyzwanie **Superteam Poland: Finance Without Intermediaries** �
 | [`instructions/set_price.rs`](programs/zwrotka/src/instructions/set_price.rs) | jedyny sposób zmiany ceny; każda zmiana trafia do historii w `Offer` |
 | [`state.rs` → `Purchase::due`](programs/zwrotka/src/state.rs) | należność = `min(zapłacone − najniższa cena w oknie, rezerwa) − już odebrane` |
 | [`instructions/claim_difference.rs`](programs/zwrotka/src/instructions/claim_difference.rs) | **wypłata zwrotu bez podpisu sprzedawcy** |
-| [`instructions/release.rs`](programs/zwrotka/src/instructions/release.rs) | po końcu okna: najpierw należność kupującego, potem reszta sprzedawcy |
+| [`instructions/release.rs`](programs/zwrotka/src/instructions/release.rs) | po końcu okna: najpierw należność kupującego, potem reszta sprzedawcy; zamyka też prośbę o zwrot (rent → kupujący) |
 | [`instructions/refund_purchase.rs`](programs/zwrotka/src/instructions/refund_purchase.rs) | anulowanie zakupu przez sprzedawcę: kupujący dostaje **co najmniej całą rezerwę** (resztę dopłaca sprzedawca), więc anulowaniem nie da się odebrać gwarancji |
 | [`instructions/close_sales.rs`](programs/zwrotka/src/instructions/close_sales.rs) | koniec sprzedaży; anulowanie oferty = `close_sales` + `refund_purchase` dla każdego zakupu |
 | [`instructions/request_refund.rs`](programs/zwrotka/src/instructions/request_refund.rs) | prośba kupującego o zwrot (konto `RefundRequest`), decyzja należy do sprzedawcy |
@@ -53,7 +53,7 @@ HackYeah 2026 · wyzwanie **Superteam Poland: Finance Without Intermediaries** �
 ## Uruchomienie
 
 ```bash
-make test                      # program + 19 testów LiteSVM
+make test                      # program + 21 testów LiteSVM
 cd app && npm install && npm run dev   # frontend: http://localhost:5173 (Phantom, devnet)
 node app/scripts/smoke-devnet.ts       # cały scenariusz demo na devnecie z portfela CLI
 node app/scripts/cancel-check.ts       # prośba o zwrot + anulowanie zakupu na devnecie
@@ -72,7 +72,7 @@ Więcej: [`docs/PROJEKT.md`](docs/PROJEKT.md) (mechanizm, demo), [`docs/PLAN.md`
 
 Ta sekcja jest instrukcją dla agenta AI (Claude Code, Codex itp.), który stawia środowisko na komputerze kolejnej osoby z zespołu.
 
-**Cel:** po zakończeniu w katalogu repo `make check` kończy się kodem 0, a `make test` pokazuje `test result: ok. 19 passed`.
+**Cel:** po zakończeniu w katalogu repo `make check` kończy się kodem 0, a `make test` pokazuje `test result: ok. 21 passed`.
 
 ### Zasady
 
@@ -177,7 +177,7 @@ make check     # ma się skończyć kodem 0; WARN o saldzie 0 SOL jest dopuszcza
 make test      # pierwszy raz 15–35 min (pobiera platform-tools ~3 GB i kompiluje), potem ~40 s
 ```
 
-Oczekiwany wynik `make test`: linia `test result: ok. 19 passed; 0 failed`.
+Oczekiwany wynik `make test`: linia `test result: ok. 21 passed; 0 failed`.
 
 Opcjonalnie, sprawdzenie deployu bez SOL: `make localnet` w osobnym terminalu, potem `make deploy-local`.
 
@@ -220,7 +220,7 @@ Wspólny Program ID: `44sG9n516FQKsDNC2uwyKPUKSksyDLH4ypzsVHgJGGB7`. Jego keypai
 Anchor.toml               # przypięte wersje Anchora i Solany, Program ID
 Makefile                  # komendy (build z --arch v0)
 rust-toolchain.toml       # Rust 1.89.0 dla hosta
-programs/zwrotka/         # program on-chain (Rust/Anchor) + 19 testów LiteSVM
+programs/zwrotka/         # program on-chain (Rust/Anchor) + 21 testów LiteSVM
 app/                      # frontend (Vite + React + Router + Wallet Adapter), skrypty devnet w app/scripts
 keys/                     # wspólny keypair programu (devnet)
 scripts/check-env.sh      # weryfikacja środowiska

@@ -1,7 +1,6 @@
 use anchor_lang::prelude::*;
 
 use crate::{
-    constants::*,
     error::ErrorCode,
     state::{Offer, PricePoint},
 };
@@ -17,11 +16,9 @@ pub struct SetPrice<'info> {
 /// jest ograniczony do ich rezerwy, więc koszt sprzedawcy jest znany z góry.
 pub fn handle_set_price(ctx: Context<SetPrice>, new_price: u64) -> Result<()> {
     require!(new_price > 0, ErrorCode::ZeroPrice);
+    let capacity = Offer::history_capacity(ctx.accounts.offer.to_account_info().data_len());
     let offer = &mut ctx.accounts.offer;
-    require!(
-        offer.history.len() < MAX_PRICE_CHANGES as usize,
-        ErrorCode::HistoryFull
-    );
+    require!(offer.history.len() < capacity, ErrorCode::HistoryFull);
 
     let ts = Clock::get()?.unix_timestamp;
     offer.history.push(PricePoint {

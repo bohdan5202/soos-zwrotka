@@ -66,10 +66,13 @@ function TxProvider({ children, onError }: { children: ReactNode; onError: (e: s
     setBusy(true)
     onError(null)
     try {
-      const tx = new Transaction().add(...(Array.isArray(ix) ? ix : [ix]))
-      const sig = await sendTransaction(tx, connection)
+      // Blockhash przed wysłaniem: ten sam trafia do transakcji i do potwierdzenia.
       const bh = await connection.getLatestBlockhash()
-      await connection.confirmTransaction({ signature: sig, ...bh }, 'confirmed')
+      const tx = new Transaction({ feePayer: publicKey, ...bh }).add(...(Array.isArray(ix) ? ix : [ix]))
+      const sig = await sendTransaction(tx, connection)
+      const res = await connection.confirmTransaction({ signature: sig, ...bh }, 'confirmed')
+      // confirmTransaction nie rzuca, gdy transakcja przepadła w programie: błąd jest w value.err.
+      if (res.value.err) throw new Error(`Transakcja odrzucona: ${JSON.stringify(res.value.err)}`)
       const id = Date.now()
       setToasts((t) => [{ id, label, sig }, ...t].slice(0, 3))
       setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 12000)

@@ -1,5 +1,5 @@
 import { Fragment, useMemo, useState } from 'react'
-import { useWallet } from '@solana/wallet-adapter-react'
+import { useConnection, useWallet } from '@solana/wallet-adapter-react'
 import { WalletMultiButton } from '@solana/wallet-adapter-react-ui'
 import type { PublicKey } from '@solana/web3.js'
 import { totals, type ActivityEvent } from './activity'
@@ -14,6 +14,7 @@ import {
   due,
   explorerAddr,
   explorerTx,
+  fetchPurchases,
   fmtZl,
   minRefund,
   refundPurchaseIx,
@@ -28,11 +29,14 @@ import {
   type Offer,
   type Purchase,
   type RefundRequest,
+  windowEndIfBoughtAt,
 } from './program'
 
 type Props = {
   offer: Offer
   name: string
+  /** Nazwa tylko z parametru ?name= (bez potwierdzenia on-chain). */
+  nameUnverified?: boolean
   purchases: Purchase[]
   mine: Purchase | null
   /** Prośby o zwrot, klucz = adres zakupu. */
@@ -90,7 +94,7 @@ export function OfferView(p: Props & { tab: string; onTab: (slug: string) => voi
 
   return (
     <>
-      <ProductCard offer={p.offer} name={p.name} isSeller={p.isSeller} />
+      <ProductCard offer={p.offer} name={p.name} nameUnverified={!!p.nameUnverified} isSeller={p.isSeller} />
       {p.offer.closed && (
         <div className="notice">⛔ Sprzedaż zakończona: nowych zakupów nie ma. Istniejące zakupy i ich rezerwy działają dalej.</div>
       )}
@@ -118,7 +122,7 @@ export function OfferView(p: Props & { tab: string; onTab: (slug: string) => voi
 
 // ---------- Karta produktu ----------
 
-function ProductCard({ offer, name, isSeller }: { offer: Offer; name: string; isSeller: boolean }) {
+function ProductCard({ offer, name, nameUnverified, isSeller }: { offer: Offer; name: string; nameUnverified: boolean; isSeller: boolean }) {
   const maxRefund = offer.price > offer.floor ? offer.price - offer.floor : 0n
   const pct = Math.round((Number(maxRefund) * 100) / Number(offer.price || 1n))
   const [copied, setCopied] = useState(false)
@@ -129,6 +133,9 @@ function ProductCard({ offer, name, isSeller }: { offer: Offer; name: string; is
         <div>
           <div className="eyebrow">{isSeller ? 'Twoja oferta' : 'Oferta'}</div>
           <h1>{name}</h1>
+          {nameUnverified && (
+            <div className="muted small">⚠️ Nazwa pochodzi z linku, nie z blockchaina: sprzedawca jej nie potwierdził.</div>
+          )}
         </div>
         <div className="price-box">
           <div className="price">{fmtZl(offer.price)}</div>
@@ -210,7 +217,7 @@ function SellerOverview({ offer, purchases, requests, events, now, busy, send, g
         </div>
         <EventList events={events ? events.slice(-5).reverse() : null} offer={offer} />
       </section>
-      <CancelOfferCard offer={offer} purchases={purchases} requests={requests} busy={busy} send={send} />
+      <CancelOfferCard offer={offer} purchases={purchases} busy={busy} send={send} />
     </>
   )
 }
@@ -220,28 +227,31 @@ function SellerOverview({ offer, purchases, requests, events, now, busy, send, g
  * refund_purchase (pełny zwrot) dla każdego zakupu, po kilka w jednej transakcji.
  */
 function CancelOfferCard({
-  offer, purchases, requests, busy, send,
-}: { offer: Offer; purchases: Purchase[]; requests: Map<string, RefundRequest>; busy: boolean; send: Send }) {
+  offer, purchases, busy, send,
+}: { offer: Offer; purchases: Purchase[]; busy: boolean; send: Send }) {
   const { publicKey } = useWallet()
+  const { connection } = useConnection()
   const [confirm, setConfirm] = useState(false)
   const total = purchases.reduce((s, p) => s + p.paid - p.claimed, 0n)
   const topUp = purchases.reduce((s, p) => s + sellerTopUp(p, p.paid - p.claimed), 0n)
 
   const cancelAll = async () => {
     if (!publicKey) return
-    const refunds = purchases.map((p) =>
-      refundPurchaseIx(publicKey, offer.address, p, p.paid - p.claimed, requests.has(p.address.toBase58())),
-    )
-    // Do 5 zwrotów na transakcję (limit rozmiaru); pierwsza zamyka też sprzedaż.
-    const first = offer.closed ? [] : [closeSalesIx(publicKey, offer.address)]
-    const chunks: (typeof refunds)[] = []
-    for (let i = 0; i < refunds.length; i += 5) chunks.push(refunds.slice(i, i + 5))
-    if (chunks.length === 0) chunks.push([])
-    for (let i = 0; i < chunks.length; i++) {
-      const ixs = i === 0 ? [...first, ...chunks[i]] : chunks[i]
-      if (ixs.length === 0) continue
-      const sig = await send(`Anulowanie oferty (${i + 1}/${chunks.length})`, ixs)
+    // Najpierw zamykamy sprzedaż: od tej chwili lista zakupów już się nie wydłuży.
+    if (!offer.closed && !(await send('Zakończenie sprzedaży', closeSalesIx(publicKey, offer.address)))) return
+    // Zakupy i kwoty bierzemy ze świeżego stanu przed każdą paczką (do 5 na transakcję):
+    // claim_difference może wywołać każdy, a zwrot ponad paid − claimed program odrzuca.
+    const done = new Set<string>()
+    for (let n = 1; n <= 100; n++) {
+      const left = (await fetchPurchases(connection, offer.address)).filter((p) => !done.has(p.address.toBase58()))
+      if (left.length === 0) break
+      const batch = left.slice(0, 5)
+      const sig = await send(
+        `Anulowanie oferty: zwroty (${n})`,
+        batch.map((p) => refundPurchaseIx(publicKey, offer.address, p, p.paid - p.claimed)),
+      )
       if (!sig) return
+      batch.forEach((p) => done.add(p.address.toBase58()))
     }
     setConfirm(false)
   }
@@ -288,7 +298,7 @@ function QuickPrice({
   const priceZl = toZl(offer.price)
   const [target, setTarget] = useState(Math.round(priceZl * 0.85))
   const sim = simulatePriceCost(offer, purchases, toLamports(target), now)
-  const changesLeft = 32 - offer.history.length
+  const changesLeft = offer.maxChanges - offer.history.length
   return (
     <section className="card">
       <div className="spread">
@@ -532,6 +542,9 @@ function BuyerPanel({ offer, mine, requests, now, busy, send }: Props) {
     const toSeller = offer.price < offer.floor ? offer.price : offer.floor
     // Po starcie wydarzenia zakup nie miałby gwarancji: program go odrzuca.
     const eventStarted = offer.eventStart > 0n && Number(offer.eventStart) <= now
+    // Faktyczne okno przy zakupie teraz: program skraca je do startu wydarzenia.
+    const guaranteeSecs = windowEndIfBoughtAt(offer, now) - now
+    const cappedByEvent = offer.eventStart > 0n && (offer.windowSecs === 0n || now + Number(offer.windowSecs) > Number(offer.eventStart))
     return (
       <>
         <BuyerSteps connected={!!publicKey} bought={false} active={false} refunded={false} />
@@ -543,7 +556,7 @@ function BuyerPanel({ offer, mine, requests, now, busy, send }: Props) {
             <div className="muted small">Cena dziś</div>
             <div className="price">{fmtZl(offer.price)}</div>
             <ul className="checks">
-              <li>✓ Ochrona do {fmtZl(offer.price - toSeller)} przez {offer.windowSecs > 0n ? fmtDuration(Number(offer.windowSecs)) : 'okres oferty'}</li>
+              <li>✓ Ochrona do {fmtZl(offer.price - toSeller)} przez {cappedByEvent ? `${fmtLeft(guaranteeSecs)} (do startu wydarzenia)` : fmtDuration(Number(offer.windowSecs))}</li>
               <li>✓ Rezerwa zablokowana w programie, nie u sprzedawcy</li>
               <li>✓ Zwrot jednym kliknięciem albo automatycznie</li>
             </ul>
@@ -673,7 +686,7 @@ function PurchaseList({ offer, purchases, requests, now, busy, send, isSeller }:
                   {isSeller && refunding === key && (
                     <tr className="refund-row">
                       <td colSpan={8}>
-                        <RefundForm offer={offer} purchase={p} hasRequest={!!req} busy={busy} send={send} onDone={() => setRefunding(null)} />
+                        <RefundForm offer={offer} purchase={p} busy={busy} send={send} onDone={() => setRefunding(null)} />
                       </td>
                     </tr>
                   )}
@@ -689,8 +702,8 @@ function PurchaseList({ offer, purchases, requests, now, busy, send, isSeller }:
 
 /** Formularz anulowania jednego zakupu: pełny albo częściowy zwrot. */
 function RefundForm({
-  offer, purchase: p, hasRequest, busy, send, onDone,
-}: { offer: Offer; purchase: Purchase; hasRequest: boolean; busy: boolean; send: Send; onDone: () => void }) {
+  offer, purchase: p, busy, send, onDone,
+}: { offer: Offer; purchase: Purchase; busy: boolean; send: Send; onDone: () => void }) {
   const { publicKey } = useWallet()
   const max = p.paid - p.claimed
   const min = minRefund(p)
@@ -724,7 +737,7 @@ function RefundForm({
         disabled={busy || !valid || !publicKey}
         onClick={async () => {
           if (!publicKey) return
-          const sig = await send(`Anulowanie zakupu ${short(p.buyer)}: zwrot ${fmtZl(amount)}`, refundPurchaseIx(publicKey, offer.address, p, amount, hasRequest))
+          const sig = await send(`Anulowanie zakupu ${short(p.buyer)}: zwrot ${fmtZl(amount)}`, refundPurchaseIx(publicKey, offer.address, p, amount))
           if (sig) onDone()
         }}
       >

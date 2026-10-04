@@ -35,47 +35,69 @@ export type Totals = {
   buyers: Set<string>;
 };
 
+// Treść po „Program log: ”, dopasowana w całości (bez tego Memo z takim tekstem udawałby zdarzenie).
 const RE = {
-  create: /Offer \d+ created: price (\d+), floor (\d+)/,
-  buy: /Bought for (\d+): (\d+) to seller, (\d+) locked until (-?\d+)/,
-  price: /Price changed to (\d+)/,
-  refund: /Refunded (\d+) to buyer/,
-  release: /Released: (\d+) to buyer, (\d+) to seller/,
+  create: /^Offer \d+ created: price (\d+), floor (\d+)$/,
+  buy: /^Bought for (\d+): (\d+) to seller, (\d+) locked until (-?\d+)$/,
+  price: /^Price changed to (\d+)$/,
+  refund: /^Refunded (\d+) to buyer$/,
+  release: /^Released: (\d+) to buyer, (\d+) to seller$/,
   // Starsza wersja programu dopisywała ", N back to seller"; obecna już nie (rezerwa idzie w całości do kupującego).
-  sellerRefund: /Refund by seller: (\d+) to buyer \((\d+) from reserve, (\d+) from seller\)(?:, (\d+) back to seller)?/,
-  closeSales: /Sales closed/,
+  sellerRefund: /^Refund by seller: (\d+) to buyer \((\d+) from reserve, (\d+) from seller\)(?:, (\d+) back to seller)?$/,
+  closeSales: /^Sales closed$/,
 };
 
 const PROGRAM = PROGRAM_ID.toBase58();
+const LOG = "Program log: ";
+const INVOKE = /^Program (\w+) invoke \[(\d+)\]$/;
+const EXIT = /^Program \w+ (success|failed)/;
 
 /** Zdarzenia programu z jednej transakcji (pusta lista, jeśli nie dotyczy Zwrotki). */
 function parseTx(sig: string, slot: number, tx: VersionedTransactionResponse | null): ActivityEvent[] {
   if (!tx) return [];
   const keys = tx.transaction.message.staticAccountKeys.map((k) => k.toBase58());
-  const ix = tx.transaction.message.compiledInstructions.find((i) => keys[i.programIdIndex] === PROGRAM);
-  if (!ix) return [];
-  // Kolejność kont jak w programie:
-  // create [seller, offer], buy [buyer, seller, offer, purchase], set_price [seller, offer],
-  // claim [offer, purchase, buyer], release [offer, purchase, buyer, seller],
-  // refund_purchase [seller, offer, purchase, buyer, ...], close_sales [seller, offer]
-  const a = ix.accountKeyIndexes.map((k) => keys[k]);
+  const ixs = tx.transaction.message.compiledInstructions;
   const base = { sig, slot, ts: tx.blockTime ?? 0, actor: keys[0], failed: !!tx.meta?.err };
   const evs: ActivityEvent[] = [];
+  // Logi dzielimy na instrukcje najwyższego poziomu (jedna transakcja może mieć np.
+  // close_sales + kilka refund_purchase) i bierzemy tylko „Program log:” wypisane
+  // bezpośrednio przez Zwrotkę, z kontami tej właśnie instrukcji.
+  const stack: string[] = [];
+  let top = -1;
   for (const l of tx.meta?.logMessages ?? []) {
+    const inv = l.match(INVOKE);
+    if (inv) {
+      if (inv[2] === "1") top++;
+      stack.push(inv[1]);
+      continue;
+    }
+    if (EXIT.test(l)) {
+      stack.pop();
+      continue;
+    }
+    if (stack.length !== 1 || stack[0] !== PROGRAM || !l.startsWith(LOG)) continue;
+    const ix = ixs[top];
+    if (!ix || keys[ix.programIdIndex] !== PROGRAM) continue;
+    // Kolejność kont jak w programie:
+    // create [seller, offer], buy [buyer, seller, offer, purchase], set_price [seller, offer],
+    // claim [offer, purchase, buyer], release [offer, purchase, buyer, seller, request],
+    // refund_purchase [seller, offer, purchase, buyer, ...], close_sales [seller, offer]
+    const a = ix.accountKeyIndexes.map((k) => keys[k]);
+    const text = l.slice(LOG.length);
     let m;
-    if ((m = l.match(RE.create)))
+    if ((m = text.match(RE.create)))
       evs.push({ ...base, kind: "create", offer: a[1], seller: a[0], amount: BigInt(m[1]), toSeller: BigInt(m[2]) });
-    else if ((m = l.match(RE.buy)))
+    else if ((m = text.match(RE.buy)))
       evs.push({ ...base, kind: "buy", offer: a[2], seller: a[1], buyer: a[0], amount: BigInt(m[1]), toSeller: BigInt(m[2]), locked: BigInt(m[3]), until: Number(m[4]) });
-    else if ((m = l.match(RE.price)))
+    else if ((m = text.match(RE.price)))
       evs.push({ ...base, kind: "price", offer: a[1], seller: a[0], amount: BigInt(m[1]) });
-    else if ((m = l.match(RE.refund)))
+    else if ((m = text.match(RE.refund)))
       evs.push({ ...base, kind: "refund", offer: a[0], buyer: a[2], amount: BigInt(m[1]) });
-    else if ((m = l.match(RE.release)))
+    else if ((m = text.match(RE.release)))
       evs.push({ ...base, kind: "release", offer: a[0], buyer: a[2], seller: a[3], toBuyer: BigInt(m[1]), toSeller: BigInt(m[2]) });
-    else if ((m = l.match(RE.sellerRefund)))
+    else if ((m = text.match(RE.sellerRefund)))
       evs.push({ ...base, kind: "sellerRefund", offer: a[1], seller: a[0], buyer: a[3], amount: BigInt(m[1]), fromSeller: BigInt(m[3]), toSeller: BigInt(m[4] ?? "0") });
-    else if (RE.closeSales.test(l)) evs.push({ ...base, kind: "closeSales", offer: a[1], seller: a[0] });
+    else if (RE.closeSales.test(text)) evs.push({ ...base, kind: "closeSales", offer: a[1], seller: a[0] });
   }
   return evs;
 }
@@ -130,7 +152,9 @@ function once(c: Connection, address: PublicKey, limit: number) {
   return p;
 }
 
-export const fetchActivity = (c: Connection, offer: PublicKey) => once(c, offer, 200);
+/** Zdarzenia tej oferty; transakcje, które tylko dotykają jej adresu, nie dokładają cudzych zdarzeń. */
+export const fetchActivity = (c: Connection, offer: PublicKey) =>
+  once(c, offer, 200).then((evs) => evs.filter((e) => e.offer === offer.toBase58()));
 export const fetchWalletActivity = (c: Connection, wallet: PublicKey, limit = 60) => once(c, wallet, limit);
 
 export type Role = "seller" | "buyer";

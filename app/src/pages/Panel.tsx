@@ -13,6 +13,7 @@ import {
   fetchRefundRequests,
   fetchSellerOffers,
   fmtZl,
+  liveRequests,
   readTitles,
   releaseIx,
   sellerStats,
@@ -55,7 +56,7 @@ export function Panel() {
         fetchRefundRequests(connection, o.address),
         fetchActivity(connection, o.address).catch(() => [] as ActivityEvent[]),
       ])
-      out.push({ offer: o, purchases, requests, events })
+      out.push({ offer: o, purchases, requests: liveRequests(requests, purchases), events })
     }
     setRows(out.sort((a, b) => Number(b.offer.offerId - a.offer.offerId)))
   }, [connection, publicKey])
