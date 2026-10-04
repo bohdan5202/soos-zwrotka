@@ -9,11 +9,13 @@ npm run build      # produkcyjny build do dist/
 node scripts/smoke-devnet.ts   # cały scenariusz demo na devnecie z portfela CLI
 ```
 
-Opcjonalnie własny RPC (publiczny devnet ma niskie limity), w `app/.env.local`:
+Własny RPC (publiczny devnet ma niskie limity) w `app/.env` albo `app/.env.local`:
 
 ```
-VITE_RPC_URL=https://devnet.helius-rpc.com/?api-key=...
+RPC_URL=https://devnet.helius-rpc.com/?api-key=...
 ```
+
+Przeglądarka nie zna tego adresu: łączy się z `/api/rpc`. Lokalnie to proxy Vite (`vite.config.ts`), na Vercel funkcja `api/rpc.ts`, która przepuszcza tylko metody używane przez frontend. Na Vercel ustaw `RPC_URL` w Project → Settings → Environment Variables. Potwierdzenia transakcji idą przez publiczny WebSocket devnetu (`VITE_WS_URL`, bez klucza). Na Netlify (`public/_redirects`) funkcji `/api/rpc` nie ma.
 
 ## Adresy (React Router)
 

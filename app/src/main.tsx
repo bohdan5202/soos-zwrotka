@@ -8,15 +8,18 @@ import './index.css'
 import './classic.css'
 import App from './App.tsx'
 
-// Publiczny RPC devnetu ma niskie limity. Na demo warto ustawić własny w app/.env.local:
-// VITE_RPC_URL=https://devnet.helius-rpc.com/?api-key=...
-const RPC = import.meta.env.VITE_RPC_URL || 'https://api.devnet.solana.com'
+// RPC idzie przez naszego pośrednika /api/rpc (funkcja Vercel, lokalnie proxy Vite):
+// adres z kluczem jest w RPC_URL po stronie serwera, nie w kodzie przeglądarki.
+const RPC = `${window.location.origin}/api/rpc`
+// Potwierdzenia transakcji (signatureSubscribe) wymagają WebSocketu, którego funkcja nie obsługuje:
+// publiczny WebSocket devnetu, bez klucza. Można nadpisać w VITE_WS_URL.
+const WS = import.meta.env.VITE_WS_URL || 'wss://api.devnet.solana.com'
 
 // Phantom wykrywany przez Wallet Standard, lista adapterów może być pusta.
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <BrowserRouter>
-      <ConnectionProvider endpoint={RPC}>
+      <ConnectionProvider endpoint={RPC} config={{ commitment: 'confirmed', wsEndpoint: WS }}>
         <WalletProvider wallets={[]} autoConnect>
           <WalletModalProvider>
             <App />
